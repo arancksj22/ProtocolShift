@@ -4,6 +4,10 @@ This repository is a **controlled experimental testbed** to measure the impact o
 
 The goal is to isolate protocol-level effects (serialization overhead, HTTP/2 multiplexing, header compression) across different storage backends, and validate migration decisions using **observability metrics** rather than anecdotes.
 
+## Architecture diagram
+
+![ProtocolShift architecture diagram](docs/architecture%20diagram%20protocal%20shift.jfif)
+
 ## What this project measures
 
 We benchmark the same CRUD-style operations across:
