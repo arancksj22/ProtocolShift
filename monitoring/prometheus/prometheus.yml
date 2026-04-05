@@ -1,88 +1,57 @@
-# ──────────────────────────────────────────────────────────
-# Prometheus scrape configuration — ProtocolShift testbed
-#
-# Scrape targets:
-#   REST suite  → prometheus-fastapi-instrumentator exposes
-#                 metrics on GET /metrics of each service
-#   gRPC suite  → prometheus-client start_http_server() sidecar
-#                 exposes metrics on a separate HTTP port
-#
-# Metric prefixes to know:
-#   http_*                         → FastAPI auto-instrumented (REST suite)
-#   grpc_postgres_*                → gRPC Postgres servicer
-#   grpc_mongo_*                   → gRPC Mongo servicer
-#   grpc_redis_*                   → gRPC Redis servicer
-# ──────────────────────────────────────────────────────────
-
 global:
-  scrape_interval:     5s   # pull every 5 s — tight enough for benchmark granularity
+  scrape_interval:     5s
   evaluation_interval: 5s
   scrape_timeout:      4s
-
   external_labels:
     project: "protocolshift"
 
-# ──────────────────────────────────────────────
-# REST suite — FastAPI /metrics endpoints
-# ──────────────────────────────────────────────
 scrape_configs:
 
+  # ── REST suite — FastAPI /metrics endpoints ──────────────────
   - job_name: "rest-postgres"
     static_configs:
       - targets: ["rest-postgres:8001"]
-    metrics_path: /metrics
-    labels:
-      suite:    "rest"
-      backend:  "postgres"
+        labels:
+          suite:   "rest"
+          backend: "postgres"
 
   - job_name: "rest-mongo"
     static_configs:
       - targets: ["rest-mongo:8002"]
-    metrics_path: /metrics
-    labels:
-      suite:    "rest"
-      backend:  "mongo"
+        labels:
+          suite:   "rest"
+          backend: "mongo"
 
   - job_name: "rest-redis"
     static_configs:
       - targets: ["rest-redis:8003"]
-    metrics_path: /metrics
-    labels:
-      suite:    "rest"
-      backend:  "redis"
+        labels:
+          suite:   "rest"
+          backend: "redis"
 
-# ──────────────────────────────────────────────
-# gRPC suite — Prometheus sidecar HTTP servers
-# ──────────────────────────────────────────────
-
+  # ── gRPC suite — Prometheus sidecar HTTP servers ─────────────
   - job_name: "grpc-postgres"
     static_configs:
       - targets: ["grpc-postgres:50061"]
-    metrics_path: /metrics
-    labels:
-      suite:    "grpc"
-      backend:  "postgres"
+        labels:
+          suite:   "grpc"
+          backend: "postgres"
 
   - job_name: "grpc-mongo"
     static_configs:
       - targets: ["grpc-mongo:50062"]
-    metrics_path: /metrics
-    labels:
-      suite:    "grpc"
-      backend:  "mongo"
+        labels:
+          suite:   "grpc"
+          backend: "mongo"
 
   - job_name: "grpc-redis"
     static_configs:
       - targets: ["grpc-redis:50063"]
-    metrics_path: /metrics
-    labels:
-      suite:    "grpc"
-      backend:  "redis"
+        labels:
+          suite:   "grpc"
+          backend: "redis"
 
-# ──────────────────────────────────────────────
-# Prometheus self-monitoring
-# ──────────────────────────────────────────────
-
+  # ── Prometheus self-monitoring ───────────────────────────────
   - job_name: "prometheus"
     static_configs:
       - targets: ["localhost:9090"]
