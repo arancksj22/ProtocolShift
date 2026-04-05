@@ -145,9 +145,10 @@ function Test-RestService($name, $base) {
 # ---------------------------------------------------------
 function Invoke-Grpc($address, $rpc, $data) {
     $json = $data | ConvertTo-Json -Compress
-    # Wrap in single quotes so PowerShell doesn't strip the double quotes inside the JSON
-    $jsonArg = "'$json'"
-    $raw = Invoke-Expression "grpcurl -plaintext -d $jsonArg $address `"benchmark.BenchmarkService/$rpc`" 2>&1"
+    # Windows PowerShell strips double quotes when calling external EXEs.
+    # We must explicitly backslash-escape them to preserve valid JSON.
+    $jsonEscaped = $json -replace '"', '\"'
+    $raw = grpcurl -plaintext -d $jsonEscaped $address "benchmark.BenchmarkService/$rpc" 2>&1
     if ($LASTEXITCODE -ne 0) { return "ERROR: $raw" }
     try   { return $raw | ConvertFrom-Json }
     catch { return "JSON PARSE ERROR: $raw" }
