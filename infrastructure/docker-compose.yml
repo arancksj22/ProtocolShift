@@ -1,25 +1,19 @@
-version: "3.9"
-
 # ──────────────────────────────────────────────────────────────────────────────
 # ProtocolShift — docker-compose
 #
-# Brings up:
-#   Databases   : postgres, mongo, redis
-#   REST suite  : rest-postgres (:8001), rest-mongo (:8002), rest-redis (:8003)
-#   gRPC suite  : grpc-postgres (:50051), grpc-mongo (:50052), grpc-redis (:50053)
-#   Observability: prometheus (:9090), grafana (:3000)
+# Run from the infrastructure/ directory:  docker compose up --build
 #
-# Usage:
-#   docker compose up --build
+# Brings up:
+#   Databases    : postgres, mongo, redis
+#   REST suite   : rest-postgres (:8001), rest-mongo (:8002), rest-redis (:8003)
+#   gRPC suite   : grpc-postgres (:50051), grpc-mongo (:50052), grpc-redis (:50053)
+#   Observability: prometheus (:9090), grafana (:3000)
 # ──────────────────────────────────────────────────────────────────────────────
 
 networks:
   bench:
     driver: bridge
 
-# ────────────────────────────────────────────
-# Persistent volumes for databases
-# ────────────────────────────────────────────
 volumes:
   pg_data:
   mongo_data:
@@ -79,10 +73,12 @@ services:
 
   # ──────────────────────────────────────────
   # REST suite
+  # Build context is ../services (one level up from docker-compose.yml)
+  # so the Dockerfile can reach both rest-suite/ and other sibling dirs.
   # ──────────────────────────────────────────
   rest-postgres:
     build:
-      context: ./services
+      context: ../services
       dockerfile: rest-suite/Dockerfile
     command: ["uvicorn", "postgres_service:app", "--host", "0.0.0.0", "--port", "8001"]
     environment:
@@ -96,7 +92,7 @@ services:
 
   rest-mongo:
     build:
-      context: ./services
+      context: ../services
       dockerfile: rest-suite/Dockerfile
     command: ["uvicorn", "mongo_service:app", "--host", "0.0.0.0", "--port", "8002"]
     environment:
@@ -110,7 +106,7 @@ services:
 
   rest-redis:
     build:
-      context: ./services
+      context: ../services
       dockerfile: rest-suite/Dockerfile
     command: ["uvicorn", "redis_service:app", "--host", "0.0.0.0", "--port", "8003"]
     environment:
@@ -124,10 +120,11 @@ services:
 
   # ──────────────────────────────────────────
   # gRPC suite
+  # Same ../services context lets the Dockerfile reach protobufs/
   # ──────────────────────────────────────────
   grpc-postgres:
     build:
-      context: ./services
+      context: ../services
       dockerfile: grpc-suite/Dockerfile
     command: ["python", "postgres_service.py"]
     environment:
@@ -135,8 +132,8 @@ services:
       GRPC_POSTGRES_PORT:         "50051"
       GRPC_POSTGRES_METRICS_PORT: "50061"
     ports:
-      - "50051:50051"   # gRPC
-      - "50061:50061"   # Prometheus metrics
+      - "50051:50051"
+      - "50061:50061"
     networks: [bench]
     depends_on:
       postgres:
@@ -144,7 +141,7 @@ services:
 
   grpc-mongo:
     build:
-      context: ./services
+      context: ../services
       dockerfile: grpc-suite/Dockerfile
     command: ["python", "mongo_service.py"]
     environment:
@@ -161,7 +158,7 @@ services:
 
   grpc-redis:
     build:
-      context: ./services
+      context: ../services
       dockerfile: grpc-suite/Dockerfile
     command: ["python", "redis_service.py"]
     environment:
@@ -183,11 +180,11 @@ services:
     image: prom/prometheus:v2.51.2
     restart: unless-stopped
     volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
-      - "--web.enable-lifecycle"           # allows hot-reload via POST /-/reload
+      - "--web.enable-lifecycle"
     ports:
       - "9090:9090"
     networks: [bench]
@@ -199,11 +196,10 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: "protocolshift"
       GF_AUTH_ANONYMOUS_ENABLED:  "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
-      # Auto-provision datasource and dashboards on startup
       GF_PATHS_PROVISIONING: "/etc/grafana/provisioning"
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
       - "3000:3000"
     networks: [bench]
