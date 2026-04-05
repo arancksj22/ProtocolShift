@@ -3,7 +3,13 @@ REST Suite — MongoDB Service
 ==============================
 Port  : 8002
 Driver: motor (async MongoDB driver)
-Model : BenchmarkRecord  ← identical to gRPC suite model
+Model : BenchmarkRecord { id: int, payload: str }
+        ← identical to gRPC suite model
+
+ID strategy: an atomic counter document in the same collection
+             (findOneAndUpdate on a dedicated counters collection)
+             so the integer id behaves like an auto-increment.
+
 Endpoints:
   POST   /records          → Create
   GET    /records/{id}     → Read
@@ -15,9 +21,7 @@ Endpoints:
 """
 
 import os
-import uuid
-from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
@@ -33,32 +37,23 @@ load_dotenv()
 MONGO_URI: str = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 MONGO_DB: str = os.getenv("MONGO_DB", "benchmarkdb")
 MONGO_COLLECTION: str = "benchmark_records"
+MONGO_COUNTERS: str = "benchmark_counters"
 
 # ──────────────────────────────────────────────
 # Shared Data Model
 # (Pydantic mirror of the protobuf BenchmarkRecord)
 # ──────────────────────────────────────────────
-class BenchmarkRecordBase(BaseModel):
-    name: str = Field(..., description="Human-readable label for this record")
-    value: float = Field(..., description="Numeric measurement value")
-    payload: str = Field(
-        ...,
-        description="Variable-length blob that stresses serialization overhead",
-    )
+class BenchmarkRecordCreate(BaseModel):
+    payload: str = Field(..., description="Arbitrary string payload to benchmark serialisation")
 
 
-class BenchmarkRecordCreate(BenchmarkRecordBase):
-    pass
+class BenchmarkRecordUpdate(BaseModel):
+    payload: str = Field(..., description="Replacement payload value")
 
 
-class BenchmarkRecordUpdate(BenchmarkRecordBase):
-    pass
-
-
-class BenchmarkRecord(BenchmarkRecordBase):
-    id: str
-    created_at: datetime
-    updated_at: datetime
+class BenchmarkRecord(BaseModel):
+    id: int
+    payload: str
 
     model_config = {"from_attributes": True}
 
@@ -90,27 +85,28 @@ Instrumentator().instrument(app).expose(app)
 async def startup() -> None:
     client = AsyncIOMotorClient(MONGO_URI)
     db = client[MONGO_DB]
-    app.state.collection = db[MONGO_COLLECTION]
-    # Ensure unique index on 'id' for O(1) lookup by UUID
-    await app.state.collection.create_index("id", unique=True)
+    app.state.col = db[MONGO_COLLECTION]
+    app.state.counters = db[MONGO_COUNTERS]
+    # Unique index on our integer id field
+    await app.state.col.create_index("id", unique=True)
 
 
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
-def _doc_to_record(doc: dict) -> BenchmarkRecord:
-    return BenchmarkRecord(
-        id=doc["id"],
-        name=doc["name"],
-        value=doc["value"],
-        payload=doc["payload"],
-        created_at=doc["created_at"],
-        updated_at=doc["updated_at"],
+async def _next_id() -> int:
+    """Atomically increment and return the next integer id."""
+    result = await app.state.counters.find_one_and_update(
+        {"_id": "benchmark_records"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True,
     )
+    return result["seq"]
 
 
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
+def _doc_to_record(doc: dict) -> BenchmarkRecord:
+    return BenchmarkRecord(id=doc["id"], payload=doc["payload"])
 
 
 # ──────────────────────────────────────────────
@@ -123,26 +119,19 @@ async def health() -> dict:
 
 @app.post("/records", response_model=BenchmarkRecord, status_code=201, tags=["records"])
 async def create_record(body: BenchmarkRecordCreate) -> BenchmarkRecord:
-    """Create a new BenchmarkRecord."""
-    now = _now()
-    doc = {
-        "id": str(uuid.uuid4()),
-        "name": body.name,
-        "value": body.value,
-        "payload": body.payload,
-        "created_at": now,
-        "updated_at": now,
-    }
-    await app.state.collection.insert_one(doc)
+    """Create a new BenchmarkRecord. id is auto-incremented via a counter document."""
+    new_id = await _next_id()
+    doc = {"id": new_id, "payload": body.payload}
+    await app.state.col.insert_one(doc)
     return _doc_to_record(doc)
 
 
 @app.get("/records/{record_id}", response_model=BenchmarkRecord, tags=["records"])
-async def read_record(record_id: str) -> BenchmarkRecord:
-    """Fetch a single BenchmarkRecord by UUID."""
-    doc = await app.state.collection.find_one({"id": record_id}, {"_id": 0})
+async def read_record(record_id: int) -> BenchmarkRecord:
+    """Fetch a single BenchmarkRecord by integer id."""
+    doc = await app.state.col.find_one({"id": record_id}, {"_id": 0})
     if doc is None:
-        raise HTTPException(status_code=404, detail=f"Record '{record_id}' not found.")
+        raise HTTPException(status_code=404, detail=f"Record {record_id} not found.")
     return _doc_to_record(doc)
 
 
@@ -152,44 +141,33 @@ async def read_all_records(
     offset: int = Query(0, ge=0),
 ) -> BenchmarkRecordList:
     """List BenchmarkRecords with pagination."""
-    col = app.state.collection
-    cursor = col.find({}, {"_id": 0}).sort("created_at", -1).skip(offset).limit(limit)
+    col = app.state.col
+    cursor = col.find({}, {"_id": 0}).sort("id", 1).skip(offset).limit(limit)
     docs = await cursor.to_list(length=limit)
     total: int = await col.count_documents({})
-    return BenchmarkRecordList(
-        records=[_doc_to_record(d) for d in docs],
-        total=total,
-    )
+    return BenchmarkRecordList(records=[_doc_to_record(d) for d in docs], total=total)
 
 
 @app.put("/records/{record_id}", response_model=BenchmarkRecord, tags=["records"])
-async def update_record(record_id: str, body: BenchmarkRecordUpdate) -> BenchmarkRecord:
-    """Update an existing BenchmarkRecord."""
-    now = _now()
-    result = await app.state.collection.find_one_and_update(
+async def update_record(record_id: int, body: BenchmarkRecordUpdate) -> BenchmarkRecord:
+    """Update the payload of an existing BenchmarkRecord."""
+    result = await app.state.col.find_one_and_update(
         {"id": record_id},
-        {
-            "$set": {
-                "name": body.name,
-                "value": body.value,
-                "payload": body.payload,
-                "updated_at": now,
-            }
-        },
+        {"$set": {"payload": body.payload}},
         projection={"_id": 0},
-        return_document=True,  # motor uses True (pymongo.ReturnDocument.AFTER)
+        return_document=True,
     )
     if result is None:
-        raise HTTPException(status_code=404, detail=f"Record '{record_id}' not found.")
+        raise HTTPException(status_code=404, detail=f"Record {record_id} not found.")
     return _doc_to_record(result)
 
 
 @app.delete("/records/{record_id}", tags=["records"])
-async def delete_record(record_id: str) -> dict:
-    """Delete a BenchmarkRecord by UUID."""
-    result = await app.state.collection.delete_one({"id": record_id})
+async def delete_record(record_id: int) -> dict:
+    """Delete a BenchmarkRecord by integer id."""
+    result = await app.state.col.delete_one({"id": record_id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail=f"Record '{record_id}' not found.")
+        raise HTTPException(status_code=404, detail=f"Record {record_id} not found.")
     return {"success": True, "id": record_id}
 
 

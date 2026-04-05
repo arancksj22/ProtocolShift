@@ -4,9 +4,12 @@ gRPC Suite — PostgreSQL Service
 Port      : 50051  (gRPC)
 Port+1    : 50061  (Prometheus metrics sidecar HTTP)
 Driver    : asyncpg (async, no ORM)
-Model     : BenchmarkRecord  ← IDENTICAL to REST suite model / protobuf definition
+Model     : BenchmarkRecord { id: int, payload: str }
+            ← IDENTICAL to REST suite model / protobuf definition
 Proto     : services/protobufs/benchmark.proto
 Stubs     : generated via  bash grpc-suite/generate_stubs.sh
+
+ID strategy: PostgreSQL SERIAL primary key (auto-increment)
 
 RPCs implemented (mirror of REST endpoints):
   Create   → POST   /records
@@ -19,18 +22,13 @@ RPCs implemented (mirror of REST endpoints):
 import asyncio
 import logging
 import os
-import uuid
-from datetime import datetime, timezone
-from concurrent.futures import ThreadPoolExecutor
 
 import asyncpg
 import grpc
 from dotenv import load_dotenv
-from google.protobuf.timestamp_pb2 import Timestamp
 from grpc_reflection.v1alpha import reflection
 from prometheus_client import Counter, Histogram, start_http_server
 
-# Generated stubs (run generate_stubs.sh first)
 import benchmark_pb2
 import benchmark_pb2_grpc
 
@@ -70,25 +68,8 @@ RPC_ERRORS = Counter(
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _dt_to_proto_ts(dt: datetime) -> Timestamp:
-    ts = Timestamp()
-    ts.FromDatetime(dt)
-    return ts
-
-
 def _row_to_proto(row: asyncpg.Record) -> benchmark_pb2.BenchmarkRecord:
-    return benchmark_pb2.BenchmarkRecord(
-        id=row["id"],
-        name=row["name"],
-        value=row["value"],
-        payload=row["payload"],
-        created_at=_dt_to_proto_ts(row["created_at"]),
-        updated_at=_dt_to_proto_ts(row["updated_at"]),
-    )
+    return benchmark_pb2.BenchmarkRecord(id=row["id"], payload=row["payload"])
 
 
 async def _ensure_table(pool: asyncpg.Pool) -> None:
@@ -96,12 +77,8 @@ async def _ensure_table(pool: asyncpg.Pool) -> None:
         await conn.execute(
             """
             CREATE TABLE IF NOT EXISTS benchmark_records (
-                id          TEXT        PRIMARY KEY,
-                name        TEXT        NOT NULL,
-                value       DOUBLE PRECISION NOT NULL,
-                payload     TEXT        NOT NULL,
-                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                id      SERIAL  PRIMARY KEY,
+                payload TEXT    NOT NULL
             );
             """
         )
@@ -129,22 +106,10 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
         RPC_REQUESTS.labels(method=method).inc()
         with RPC_LATENCY.labels(method=method).time():
             try:
-                record_id = str(uuid.uuid4())
-                now = _now()
                 async with self._pool.acquire() as conn:
                     row = await conn.fetchrow(
-                        """
-                        INSERT INTO benchmark_records
-                               (id, name, value, payload, created_at, updated_at)
-                        VALUES ($1, $2, $3, $4, $5, $6)
-                        RETURNING *
-                        """,
-                        record_id,
-                        request.name,
-                        request.value,
+                        "INSERT INTO benchmark_records (payload) VALUES ($1) RETURNING *",
                         request.payload,
-                        now,
-                        now,
                     )
                 return _row_to_proto(row)
             except Exception as exc:
@@ -169,7 +134,7 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
                 if row is None:
                     await context.abort(
                         grpc.StatusCode.NOT_FOUND,
-                        f"Record '{request.id}' not found.",
+                        f"Record {request.id} not found.",
                     )
                 return _row_to_proto(row)
             except grpc.aio.AbortError:
@@ -193,8 +158,7 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
             try:
                 async with self._pool.acquire() as conn:
                     rows = await conn.fetch(
-                        "SELECT * FROM benchmark_records "
-                        "ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+                        "SELECT * FROM benchmark_records ORDER BY id ASC LIMIT $1 OFFSET $2",
                         limit,
                         offset,
                     )
@@ -220,25 +184,16 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
         RPC_REQUESTS.labels(method=method).inc()
         with RPC_LATENCY.labels(method=method).time():
             try:
-                now = _now()
                 async with self._pool.acquire() as conn:
                     row = await conn.fetchrow(
-                        """
-                        UPDATE benchmark_records
-                           SET name = $2, value = $3, payload = $4, updated_at = $5
-                         WHERE id = $1
-                        RETURNING *
-                        """,
+                        "UPDATE benchmark_records SET payload = $2 WHERE id = $1 RETURNING *",
                         request.id,
-                        request.name,
-                        request.value,
                         request.payload,
-                        now,
                     )
                 if row is None:
                     await context.abort(
                         grpc.StatusCode.NOT_FOUND,
-                        f"Record '{request.id}' not found.",
+                        f"Record {request.id} not found.",
                     )
                 return _row_to_proto(row)
             except grpc.aio.AbortError:
@@ -265,11 +220,9 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
                 if result == "DELETE 0":
                     await context.abort(
                         grpc.StatusCode.NOT_FOUND,
-                        f"Record '{request.id}' not found.",
+                        f"Record {request.id} not found.",
                     )
-                return benchmark_pb2.DeleteRecordResponse(
-                    success=True, id=request.id
-                )
+                return benchmark_pb2.DeleteRecordResponse(success=True, id=request.id)
             except grpc.aio.AbortError:
                 raise
             except Exception as exc:
@@ -288,7 +241,6 @@ async def serve() -> None:
     )
     await _ensure_table(pool)
 
-    # Prometheus sidecar
     start_http_server(METRICS_PORT)
     log.info(f"Prometheus metrics on :{METRICS_PORT}/metrics")
 
@@ -297,7 +249,6 @@ async def serve() -> None:
         BenchmarkServicer(pool), server
     )
 
-    # gRPC reflection (allows grpcurl introspection)
     service_names = (
         benchmark_pb2.DESCRIPTOR.services_by_name["BenchmarkService"].full_name,
         reflection.SERVICE_NAME,

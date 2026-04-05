@@ -3,7 +3,11 @@ REST Suite — PostgreSQL Service
 ================================
 Port  : 8001
 Driver: asyncpg (async, no ORM so we see raw SQL latency)
-Model : BenchmarkRecord  ← identical to gRPC suite model
+Model : BenchmarkRecord { id: int, payload: str }
+        ← identical to gRPC suite model
+
+ID strategy: PostgreSQL SERIAL primary key (auto-increment, no UUID overhead)
+
 Endpoints:
   POST   /records          → Create
   GET    /records/{id}     → Read
@@ -15,10 +19,7 @@ Endpoints:
 """
 
 import os
-import uuid
-import asyncio
-from datetime import datetime, timezone
-from typing import Optional, List
+from typing import List
 
 import asyncpg
 from dotenv import load_dotenv
@@ -39,27 +40,17 @@ POSTGRES_DSN: str = os.getenv(
 # Shared Data Model
 # (Pydantic mirror of the protobuf BenchmarkRecord)
 # ──────────────────────────────────────────────
-class BenchmarkRecordBase(BaseModel):
-    name: str = Field(..., description="Human-readable label for this record")
-    value: float = Field(..., description="Numeric measurement value")
-    payload: str = Field(
-        ...,
-        description="Variable-length blob that stresses serialization overhead",
-    )
+class BenchmarkRecordCreate(BaseModel):
+    payload: str = Field(..., description="Arbitrary string payload to benchmark serialisation")
 
 
-class BenchmarkRecordCreate(BenchmarkRecordBase):
-    pass
+class BenchmarkRecordUpdate(BaseModel):
+    payload: str = Field(..., description="Replacement payload value")
 
 
-class BenchmarkRecordUpdate(BenchmarkRecordBase):
-    pass
-
-
-class BenchmarkRecord(BenchmarkRecordBase):
-    id: str
-    created_at: datetime
-    updated_at: datetime
+class BenchmarkRecord(BaseModel):
+    id: int
+    payload: str
 
     model_config = {"from_attributes": True}
 
@@ -99,12 +90,8 @@ async def startup() -> None:
         await conn.execute(
             """
             CREATE TABLE IF NOT EXISTS benchmark_records (
-                id          TEXT        PRIMARY KEY,
-                name        TEXT        NOT NULL,
-                value       DOUBLE PRECISION NOT NULL,
-                payload     TEXT        NOT NULL,
-                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                id      SERIAL  PRIMARY KEY,
+                payload TEXT    NOT NULL
             );
             """
         )
@@ -119,18 +106,7 @@ async def shutdown() -> None:
 # Helpers
 # ──────────────────────────────────────────────
 def _row_to_record(row: asyncpg.Record) -> BenchmarkRecord:
-    return BenchmarkRecord(
-        id=row["id"],
-        name=row["name"],
-        value=row["value"],
-        payload=row["payload"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-    )
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return BenchmarkRecord(id=row["id"], payload=row["payload"])
 
 
 # ──────────────────────────────────────────────
@@ -143,35 +119,24 @@ async def health() -> dict:
 
 @app.post("/records", response_model=BenchmarkRecord, status_code=201, tags=["records"])
 async def create_record(body: BenchmarkRecordCreate) -> BenchmarkRecord:
-    """Create a new BenchmarkRecord."""
-    record_id = str(uuid.uuid4())
-    now = _now()
+    """Create a new BenchmarkRecord. id is assigned by PostgreSQL SERIAL."""
     async with app.state.pool.acquire() as conn:
         row = await conn.fetchrow(
-            """
-            INSERT INTO benchmark_records (id, name, value, payload, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING *
-            """,
-            record_id,
-            body.name,
-            body.value,
+            "INSERT INTO benchmark_records (payload) VALUES ($1) RETURNING *",
             body.payload,
-            now,
-            now,
         )
     return _row_to_record(row)
 
 
 @app.get("/records/{record_id}", response_model=BenchmarkRecord, tags=["records"])
-async def read_record(record_id: str) -> BenchmarkRecord:
-    """Fetch a single BenchmarkRecord by UUID."""
+async def read_record(record_id: int) -> BenchmarkRecord:
+    """Fetch a single BenchmarkRecord by integer id."""
     async with app.state.pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT * FROM benchmark_records WHERE id = $1", record_id
         )
     if row is None:
-        raise HTTPException(status_code=404, detail=f"Record '{record_id}' not found.")
+        raise HTTPException(status_code=404, detail=f"Record {record_id} not found.")
     return _row_to_record(row)
 
 
@@ -183,50 +148,37 @@ async def read_all_records(
     """List BenchmarkRecords with pagination."""
     async with app.state.pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT * FROM benchmark_records ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+            "SELECT * FROM benchmark_records ORDER BY id ASC LIMIT $1 OFFSET $2",
             limit,
             offset,
         )
         total: int = await conn.fetchval("SELECT COUNT(*) FROM benchmark_records")
-    return BenchmarkRecordList(
-        records=[_row_to_record(r) for r in rows],
-        total=total,
-    )
+    return BenchmarkRecordList(records=[_row_to_record(r) for r in rows], total=total)
 
 
 @app.put("/records/{record_id}", response_model=BenchmarkRecord, tags=["records"])
-async def update_record(record_id: str, body: BenchmarkRecordUpdate) -> BenchmarkRecord:
-    """Update an existing BenchmarkRecord."""
-    now = _now()
+async def update_record(record_id: int, body: BenchmarkRecordUpdate) -> BenchmarkRecord:
+    """Update the payload of an existing BenchmarkRecord."""
     async with app.state.pool.acquire() as conn:
         row = await conn.fetchrow(
-            """
-            UPDATE benchmark_records
-               SET name = $2, value = $3, payload = $4, updated_at = $5
-             WHERE id = $1
-            RETURNING *
-            """,
+            "UPDATE benchmark_records SET payload = $2 WHERE id = $1 RETURNING *",
             record_id,
-            body.name,
-            body.value,
             body.payload,
-            now,
         )
     if row is None:
-        raise HTTPException(status_code=404, detail=f"Record '{record_id}' not found.")
+        raise HTTPException(status_code=404, detail=f"Record {record_id} not found.")
     return _row_to_record(row)
 
 
 @app.delete("/records/{record_id}", tags=["records"])
-async def delete_record(record_id: str) -> dict:
-    """Delete a BenchmarkRecord by UUID."""
+async def delete_record(record_id: int) -> dict:
+    """Delete a BenchmarkRecord by integer id."""
     async with app.state.pool.acquire() as conn:
         result = await conn.execute(
             "DELETE FROM benchmark_records WHERE id = $1", record_id
         )
-    # asyncpg returns "DELETE N" string
     if result == "DELETE 0":
-        raise HTTPException(status_code=404, detail=f"Record '{record_id}' not found.")
+        raise HTTPException(status_code=404, detail=f"Record {record_id} not found.")
     return {"success": True, "id": record_id}
 
 

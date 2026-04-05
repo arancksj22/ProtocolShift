@@ -4,9 +4,13 @@ gRPC Suite — MongoDB Service
 Port      : 50052  (gRPC)
 Port+1    : 50062  (Prometheus metrics sidecar HTTP)
 Driver    : motor (async MongoDB driver)
-Model     : BenchmarkRecord  ← IDENTICAL to REST suite model / protobuf definition
+Model     : BenchmarkRecord { id: int, payload: str }
+            ← IDENTICAL to REST suite model / protobuf definition
 Proto     : services/protobufs/benchmark.proto
 Stubs     : generated via  bash grpc-suite/generate_stubs.sh
+
+ID strategy: atomic counter document via findOneAndUpdate (upsert)
+             giving auto-increment integer ids.
 
 RPCs implemented (mirror of REST endpoints):
   Create   → POST   /records
@@ -19,12 +23,9 @@ RPCs implemented (mirror of REST endpoints):
 import asyncio
 import logging
 import os
-import uuid
-from datetime import datetime, timezone
 
 import grpc
 from dotenv import load_dotenv
-from google.protobuf.timestamp_pb2 import Timestamp
 from grpc_reflection.v1alpha import reflection
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 from prometheus_client import Counter, Histogram, start_http_server
@@ -42,6 +43,7 @@ log = logging.getLogger(__name__)
 MONGO_URI: str = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 MONGO_DB: str = os.getenv("MONGO_DB", "benchmarkdb")
 MONGO_COLLECTION: str = "benchmark_records"
+MONGO_COUNTERS: str = "benchmark_counters"
 GRPC_PORT: int = int(os.getenv("GRPC_MONGO_PORT", "50052"))
 METRICS_PORT: int = int(os.getenv("GRPC_MONGO_METRICS_PORT", "50062"))
 
@@ -68,25 +70,8 @@ RPC_ERRORS = Counter(
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _dt_to_proto_ts(dt: datetime) -> Timestamp:
-    ts = Timestamp()
-    ts.FromDatetime(dt)
-    return ts
-
-
 def _doc_to_proto(doc: dict) -> benchmark_pb2.BenchmarkRecord:
-    return benchmark_pb2.BenchmarkRecord(
-        id=doc["id"],
-        name=doc["name"],
-        value=float(doc["value"]),
-        payload=doc["payload"],
-        created_at=_dt_to_proto_ts(doc["created_at"]),
-        updated_at=_dt_to_proto_ts(doc["updated_at"]),
-    )
+    return benchmark_pb2.BenchmarkRecord(id=int(doc["id"]), payload=doc["payload"])
 
 
 # ──────────────────────────────────────────────
@@ -98,8 +83,18 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
     All method signatures intentionally mirror the REST suite's endpoints.
     """
 
-    def __init__(self, collection: AsyncIOMotorCollection) -> None:
-        self._col = collection
+    def __init__(self, col: AsyncIOMotorCollection, counters: AsyncIOMotorCollection) -> None:
+        self._col = col
+        self._counters = counters
+
+    async def _next_id(self) -> int:
+        result = await self._counters.find_one_and_update(
+            {"_id": "benchmark_records"},
+            {"$inc": {"seq": 1}},
+            upsert=True,
+            return_document=True,
+        )
+        return result["seq"]
 
     # ── Create ──────────────────────────────────
     async def Create(
@@ -111,15 +106,8 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
         RPC_REQUESTS.labels(method=method).inc()
         with RPC_LATENCY.labels(method=method).time():
             try:
-                now = _now()
-                doc = {
-                    "id": str(uuid.uuid4()),
-                    "name": request.name,
-                    "value": request.value,
-                    "payload": request.payload,
-                    "created_at": now,
-                    "updated_at": now,
-                }
+                new_id = await self._next_id()
+                doc = {"id": new_id, "payload": request.payload}
                 await self._col.insert_one(doc)
                 return _doc_to_proto(doc)
             except Exception as exc:
@@ -141,7 +129,7 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
                 if doc is None:
                     await context.abort(
                         grpc.StatusCode.NOT_FOUND,
-                        f"Record '{request.id}' not found.",
+                        f"Record {request.id} not found.",
                     )
                 return _doc_to_proto(doc)
             except grpc.aio.AbortError:
@@ -165,7 +153,7 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
             try:
                 cursor = (
                     self._col.find({}, {"_id": 0})
-                    .sort("created_at", -1)
+                    .sort("id", 1)
                     .skip(offset)
                     .limit(limit)
                 )
@@ -190,24 +178,16 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
         RPC_REQUESTS.labels(method=method).inc()
         with RPC_LATENCY.labels(method=method).time():
             try:
-                now = _now()
                 result = await self._col.find_one_and_update(
                     {"id": request.id},
-                    {
-                        "$set": {
-                            "name": request.name,
-                            "value": request.value,
-                            "payload": request.payload,
-                            "updated_at": now,
-                        }
-                    },
+                    {"$set": {"payload": request.payload}},
                     projection={"_id": 0},
                     return_document=True,
                 )
                 if result is None:
                     await context.abort(
                         grpc.StatusCode.NOT_FOUND,
-                        f"Record '{request.id}' not found.",
+                        f"Record {request.id} not found.",
                     )
                 return _doc_to_proto(result)
             except grpc.aio.AbortError:
@@ -231,11 +211,9 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
                 if result.deleted_count == 0:
                     await context.abort(
                         grpc.StatusCode.NOT_FOUND,
-                        f"Record '{request.id}' not found.",
+                        f"Record {request.id} not found.",
                     )
-                return benchmark_pb2.DeleteRecordResponse(
-                    success=True, id=request.id
-                )
+                return benchmark_pb2.DeleteRecordResponse(success=True, id=request.id)
             except grpc.aio.AbortError:
                 raise
             except Exception as exc:
@@ -251,16 +229,16 @@ async def serve() -> None:
     log.info("Connecting to MongoDB...")
     client = AsyncIOMotorClient(MONGO_URI)
     db = client[MONGO_DB]
-    collection = db[MONGO_COLLECTION]
-    await collection.create_index("id", unique=True)
+    col = db[MONGO_COLLECTION]
+    counters = db[MONGO_COUNTERS]
+    await col.create_index("id", unique=True)
 
-    # Prometheus sidecar
     start_http_server(METRICS_PORT)
     log.info(f"Prometheus metrics on :{METRICS_PORT}/metrics")
 
     server = grpc.aio.server()
     benchmark_pb2_grpc.add_BenchmarkServiceServicer_to_server(
-        BenchmarkServicer(collection), server
+        BenchmarkServicer(col, counters), server
     )
 
     service_names = (

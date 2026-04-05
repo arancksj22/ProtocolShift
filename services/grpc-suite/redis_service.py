@@ -4,13 +4,15 @@ gRPC Suite — Redis Service
 Port      : 50053  (gRPC)
 Port+1    : 50063  (Prometheus metrics sidecar HTTP)
 Driver    : redis.asyncio
-Model     : BenchmarkRecord  ← IDENTICAL to REST suite model / protobuf definition
+Model     : BenchmarkRecord { id: int, payload: str }
+            ← IDENTICAL to REST suite model / protobuf definition
 Proto     : services/protobufs/benchmark.proto
 Stubs     : generated via  bash grpc-suite/generate_stubs.sh
 
 Storage strategy (mirrors REST redis_service.py exactly):
-  - Each record: Redis hash at key  benchmark:<uuid>
-  - Sorted set   benchmark:index  (score=epoch_ms) for O(log N) pagination
+  - ID        : atomic INCR on key  benchmark:counter
+  - Each record: Redis hash at key  benchmark:<id>
+  - Sorted set : benchmark:index  (score=id) for O(log N) pagination
 
 RPCs implemented (mirror of REST endpoints):
   Create   → POST   /records
@@ -23,13 +25,10 @@ RPCs implemented (mirror of REST endpoints):
 import asyncio
 import logging
 import os
-import uuid
-from datetime import datetime, timezone
 
 import grpc
 import redis.asyncio as aioredis
 from dotenv import load_dotenv
-from google.protobuf.timestamp_pb2 import Timestamp
 from grpc_reflection.v1alpha import reflection
 from prometheus_client import Counter, Histogram, start_http_server
 
@@ -46,6 +45,7 @@ log = logging.getLogger(__name__)
 REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 RECORD_PREFIX: str = "benchmark:"
 INDEX_KEY: str = "benchmark:index"
+COUNTER_KEY: str = "benchmark:counter"
 GRPC_PORT: int = int(os.getenv("GRPC_REDIS_PORT", "50053"))
 METRICS_PORT: int = int(os.getenv("GRPC_REDIS_METRICS_PORT", "50063"))
 
@@ -72,34 +72,14 @@ RPC_ERRORS = Counter(
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
-def _record_key(record_id: str) -> str:
+def _record_key(record_id: int) -> str:
     return f"{RECORD_PREFIX}{record_id}"
 
 
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _to_epoch_ms(dt: datetime) -> float:
-    return dt.timestamp() * 1000
-
-
-def _dt_to_proto_ts(dt: datetime) -> Timestamp:
-    ts = Timestamp()
-    ts.FromDatetime(dt)
-    return ts
-
-
 def _hash_to_proto(data: dict) -> benchmark_pb2.BenchmarkRecord:
-    created_at = datetime.fromisoformat(data["created_at"])
-    updated_at = datetime.fromisoformat(data["updated_at"])
     return benchmark_pb2.BenchmarkRecord(
-        id=data["id"],
-        name=data["name"],
-        value=float(data["value"]),
+        id=int(data["id"]),
         payload=data["payload"],
-        created_at=_dt_to_proto_ts(created_at),
-        updated_at=_dt_to_proto_ts(updated_at),
     )
 
 
@@ -126,19 +106,11 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
         RPC_REQUESTS.labels(method=method).inc()
         with RPC_LATENCY.labels(method=method).time():
             try:
-                now = _now()
-                record_id = str(uuid.uuid4())
-                data = {
-                    "id": record_id,
-                    "name": request.name,
-                    "value": str(request.value),
-                    "payload": request.payload,
-                    "created_at": now.isoformat(),
-                    "updated_at": now.isoformat(),
-                }
+                new_id: int = await self._r.incr(COUNTER_KEY)
+                data = {"id": str(new_id), "payload": request.payload}
                 async with self._r.pipeline(transaction=True) as pipe:
-                    pipe.hset(_record_key(record_id), mapping=data)
-                    pipe.zadd(INDEX_KEY, {record_id: _to_epoch_ms(now)})
+                    pipe.hset(_record_key(new_id), mapping=data)
+                    pipe.zadd(INDEX_KEY, {str(new_id): new_id})
                     await pipe.execute()
                 return _hash_to_proto(data)
             except Exception as exc:
@@ -160,7 +132,7 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
                 if not data:
                     await context.abort(
                         grpc.StatusCode.NOT_FOUND,
-                        f"Record '{request.id}' not found.",
+                        f"Record {request.id} not found.",
                     )
                 return _hash_to_proto(data)
             except grpc.aio.AbortError:
@@ -182,11 +154,11 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
         offset = request.offset
         with RPC_LATENCY.labels(method=method).time():
             try:
-                ids = await self._r.zrevrange(INDEX_KEY, offset, offset + limit - 1)
+                ids = await self._r.zrange(INDEX_KEY, offset, offset + limit - 1)
                 total: int = await self._r.zcard(INDEX_KEY)
                 records = []
                 for record_id in ids:
-                    data = await self._r.hgetall(_record_key(record_id))
+                    data = await self._r.hgetall(_record_key(int(record_id)))
                     if data:
                         records.append(_hash_to_proto(data))
                 return benchmark_pb2.ListRecordsResponse(records=records, total=total)
@@ -206,20 +178,12 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
         with RPC_LATENCY.labels(method=method).time():
             try:
                 key = _record_key(request.id)
-                exists = await self._r.exists(key)
-                if not exists:
+                if not await self._r.exists(key):
                     await context.abort(
                         grpc.StatusCode.NOT_FOUND,
-                        f"Record '{request.id}' not found.",
+                        f"Record {request.id} not found.",
                     )
-                now = _now()
-                update_data = {
-                    "name": request.name,
-                    "value": str(request.value),
-                    "payload": request.payload,
-                    "updated_at": now.isoformat(),
-                }
-                await self._r.hset(key, mapping=update_data)
+                await self._r.hset(key, "payload", request.payload)
                 data = await self._r.hgetall(key)
                 return _hash_to_proto(data)
             except grpc.aio.AbortError:
@@ -243,16 +207,14 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
                 async with self._r.pipeline(transaction=True) as pipe:
                     pipe.exists(key)
                     pipe.delete(key)
-                    pipe.zrem(INDEX_KEY, request.id)
+                    pipe.zrem(INDEX_KEY, str(request.id))
                     results = await pipe.execute()
                 if results[0] == 0:
                     await context.abort(
                         grpc.StatusCode.NOT_FOUND,
-                        f"Record '{request.id}' not found.",
+                        f"Record {request.id} not found.",
                     )
-                return benchmark_pb2.DeleteRecordResponse(
-                    success=True, id=request.id
-                )
+                return benchmark_pb2.DeleteRecordResponse(success=True, id=request.id)
             except grpc.aio.AbortError:
                 raise
             except Exception as exc:
@@ -269,7 +231,6 @@ async def serve() -> None:
     r = aioredis.from_url(REDIS_URL, decode_responses=True)
     await r.ping()
 
-    # Prometheus sidecar
     start_http_server(METRICS_PORT)
     log.info(f"Prometheus metrics on :{METRICS_PORT}/metrics")
 

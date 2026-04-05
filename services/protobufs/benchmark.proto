@@ -2,49 +2,42 @@ syntax = "proto3";
 
 package benchmark;
 
-import "google/protobuf/timestamp.proto";
-import "google/protobuf/empty.proto";
-
 // ──────────────────────────────────────────────
 // Shared data model — used identically in REST
 // (via Pydantic) and gRPC (via this message).
+//
+// Intentionally minimal: just an int id and a
+// string payload so that serialisation overhead
+// is the only variable being benchmarked.
 // ──────────────────────────────────────────────
 message BenchmarkRecord {
-  string id          = 1;   // UUID string
-  string name        = 2;
-  double value       = 3;
-  string payload     = 4;   // variable-length blob to stress serialization
-  google.protobuf.Timestamp created_at = 5;
-  google.protobuf.Timestamp updated_at = 6;
+  int32  id      = 1;
+  string payload = 2;
 }
 
 // ──────────────────────────────────────────────
-// Request/Response wrappers
+// Request / Response wrappers
 // ──────────────────────────────────────────────
 message CreateRecordRequest {
-  string name    = 1;
-  double value   = 2;
-  string payload = 3;
+  string payload = 1;
 }
 
 message GetRecordRequest {
-  string id = 1;
+  int32 id = 1;
 }
 
 message UpdateRecordRequest {
-  string id      = 1;
-  string name    = 2;
-  double value   = 3;
-  string payload = 4;
+  int32  id      = 1;
+  string payload = 2;
 }
 
 message DeleteRecordRequest {
-  string id = 1;
+  int32 id = 1;
 }
 
 message DeleteRecordResponse {
-  bool success = 1;
-  string id    = 2;
+  bool  success = 1;
+  int32 id      = 2;
 }
 
 message ListRecordsRequest {
@@ -54,11 +47,11 @@ message ListRecordsRequest {
 
 message ListRecordsResponse {
   repeated BenchmarkRecord records = 1;
-  int32 total                      = 2;
+  int32                    total   = 2;
 }
 
 // ──────────────────────────────────────────────
-// Service definition — implements 5 CRUD RPCs.
+// Service definition — 5 CRUD RPCs.
 // Mirrored exactly by REST suite via HTTP verbs.
 // ──────────────────────────────────────────────
 service BenchmarkService {
