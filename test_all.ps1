@@ -205,8 +205,8 @@ function Test-GrpcService($name, $address) {
     }
 
     Section "Read after Delete (expect NOT_FOUND)"
-    $gone = grpcurl -plaintext -d "{`"id`": $id}" $address "benchmark.BenchmarkService/Read" 2>&1
-    if ($gone -match "NOT_FOUND") {
+    $gone = Invoke-Grpc $address "Read" @{ id = $id }
+    if ($gone -match "NotFound" -or $gone -match "NOT_FOUND") {
         Pass "NOT_FOUND confirmed -- record correctly removed"
     }
     else {
