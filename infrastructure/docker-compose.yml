@@ -1,0 +1,211 @@
+version: "3.9"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ProtocolShift — docker-compose
+#
+# Brings up:
+#   Databases   : postgres, mongo, redis
+#   REST suite  : rest-postgres (:8001), rest-mongo (:8002), rest-redis (:8003)
+#   gRPC suite  : grpc-postgres (:50051), grpc-mongo (:50052), grpc-redis (:50053)
+#   Observability: prometheus (:9090), grafana (:3000)
+#
+# Usage:
+#   docker compose up --build
+# ──────────────────────────────────────────────────────────────────────────────
+
+networks:
+  bench:
+    driver: bridge
+
+# ────────────────────────────────────────────
+# Persistent volumes for databases
+# ────────────────────────────────────────────
+volumes:
+  pg_data:
+  mongo_data:
+
+# ────────────────────────────────────────────
+# Shared environment snippets (YAML anchors)
+# ────────────────────────────────────────────
+x-postgres-env: &postgres-env
+  POSTGRES_DSN: "postgresql://postgres:postgres@postgres:5432/benchmarkdb"
+
+x-mongo-env: &mongo-env
+  MONGO_URI: "mongodb://mongo:27017"
+  MONGO_DB:  "benchmarkdb"
+
+x-redis-env: &redis-env
+  REDIS_URL: "redis://redis:6379/0"
+
+services:
+
+  # ──────────────────────────────────────────
+  # Databases
+  # ──────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB:       benchmarkdb
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks: [bench]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks: [bench]
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks: [bench]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  # ──────────────────────────────────────────
+  # REST suite
+  # ──────────────────────────────────────────
+  rest-postgres:
+    build:
+      context: ./services/rest-suite
+      dockerfile: Dockerfile
+    command: ["uvicorn", "postgres_service:app", "--host", "0.0.0.0", "--port", "8001"]
+    environment:
+      <<: *postgres-env
+    ports:
+      - "8001:8001"
+    networks: [bench]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  rest-mongo:
+    build:
+      context: ./services/rest-suite
+      dockerfile: Dockerfile
+    command: ["uvicorn", "mongo_service:app", "--host", "0.0.0.0", "--port", "8002"]
+    environment:
+      <<: *mongo-env
+    ports:
+      - "8002:8002"
+    networks: [bench]
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  rest-redis:
+    build:
+      context: ./services/rest-suite
+      dockerfile: Dockerfile
+    command: ["uvicorn", "redis_service:app", "--host", "0.0.0.0", "--port", "8003"]
+    environment:
+      <<: *redis-env
+    ports:
+      - "8003:8003"
+    networks: [bench]
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ──────────────────────────────────────────
+  # gRPC suite
+  # ──────────────────────────────────────────
+  grpc-postgres:
+    build:
+      context: ./services/grpc-suite
+      dockerfile: Dockerfile
+    command: ["python", "postgres_service.py"]
+    environment:
+      <<: *postgres-env
+      GRPC_POSTGRES_PORT:         "50051"
+      GRPC_POSTGRES_METRICS_PORT: "50061"
+    ports:
+      - "50051:50051"   # gRPC
+      - "50061:50061"   # Prometheus metrics
+    networks: [bench]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  grpc-mongo:
+    build:
+      context: ./services/grpc-suite
+      dockerfile: Dockerfile
+    command: ["python", "mongo_service.py"]
+    environment:
+      <<: *mongo-env
+      GRPC_MONGO_PORT:         "50052"
+      GRPC_MONGO_METRICS_PORT: "50062"
+    ports:
+      - "50052:50052"
+      - "50062:50062"
+    networks: [bench]
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  grpc-redis:
+    build:
+      context: ./services/grpc-suite
+      dockerfile: Dockerfile
+    command: ["python", "redis_service.py"]
+    environment:
+      <<: *redis-env
+      GRPC_REDIS_PORT:         "50053"
+      GRPC_REDIS_METRICS_PORT: "50063"
+    ports:
+      - "50053:50053"
+      - "50063:50063"
+    networks: [bench]
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ──────────────────────────────────────────
+  # Observability stack
+  # ──────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"           # allows hot-reload via POST /-/reload
+    ports:
+      - "9090:9090"
+    networks: [bench]
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "protocolshift"
+      GF_AUTH_ANONYMOUS_ENABLED:  "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      # Auto-provision datasource and dashboards on startup
+      GF_PATHS_PROVISIONING: "/etc/grafana/provisioning"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    networks: [bench]
+    depends_on:
+      - prometheus

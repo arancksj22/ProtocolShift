@@ -1,0 +1,398 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" },
+    { "type": "panel", "id": "timeseries", "name": "Time series", "version": "" },
+    { "type": "panel", "id": "stat", "name": "Stat", "version": "" },
+    { "type": "panel", "id": "gauge", "name": "Gauge", "version": "" },
+    { "type": "panel", "id": "table", "name": "Table", "version": "" }
+  ],
+  "annotations": { "list": [] },
+  "description": "ProtocolShift — REST vs gRPC benchmark dashboard. Tracks the Four Golden Signals (Latency, Traffic, Errors, Saturation) across all 6 services.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "🔵 SIGNAL 1 — Latency (p50 / p95 / p99)",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "p99 request latency per service. REST: derived from http_request_duration_seconds histogram. gRPC: from grpc_*_latency_seconds histograms.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 8 },
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 0.5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean", "max"] } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"rest-postgres\"}[1m])) by (le))",
+          "legendFormat": "REST / Postgres — p99",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"rest-mongo\"}[1m])) by (le))",
+          "legendFormat": "REST / Mongo — p99",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"rest-redis\"}[1m])) by (le))",
+          "legendFormat": "REST / Redis — p99",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.99, sum(rate(grpc_postgres_latency_seconds_bucket[1m])) by (le))",
+          "legendFormat": "gRPC / Postgres — p99",
+          "refId": "D"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.99, sum(rate(grpc_mongo_latency_seconds_bucket[1m])) by (le))",
+          "legendFormat": "gRPC / Mongo — p99",
+          "refId": "E"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.99, sum(rate(grpc_redis_latency_seconds_bucket[1m])) by (le))",
+          "legendFormat": "gRPC / Redis — p99",
+          "refId": "F"
+        }
+      ],
+      "title": "p99 Latency — all services",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "p50 and p95 latency per service for comparison.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 1, "fillOpacity": 4 },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "id": 2,
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean"] } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"rest-postgres\"}[1m])) by (le))",
+          "legendFormat": "REST / Postgres — p50", "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"rest-postgres\"}[1m])) by (le))",
+          "legendFormat": "REST / Postgres — p95", "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(grpc_postgres_latency_seconds_bucket[1m])) by (le))",
+          "legendFormat": "gRPC / Postgres — p50", "refId": "C"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(grpc_postgres_latency_seconds_bucket[1m])) by (le))",
+          "legendFormat": "gRPC / Postgres — p95", "refId": "D"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(grpc_redis_latency_seconds_bucket[1m])) by (le))",
+          "legendFormat": "gRPC / Redis — p50", "refId": "E"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(grpc_redis_latency_seconds_bucket[1m])) by (le))",
+          "legendFormat": "gRPC / Redis — p95", "refId": "F"
+        }
+      ],
+      "title": "p50 / p95 Latency — Postgres & Redis comparison",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "id": 101,
+      "title": "🟢 SIGNAL 2 — Traffic (Requests / sec)",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Request throughput across all 6 services over the last 1-minute window.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 10 },
+      "id": 3,
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "mean", "max"] } },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=\"rest-postgres\"}[1m]))",
+          "legendFormat": "REST / Postgres", "refId": "A"
+        },
+        {
+          "expr": "sum(rate(http_requests_total{job=\"rest-mongo\"}[1m]))",
+          "legendFormat": "REST / Mongo", "refId": "B"
+        },
+        {
+          "expr": "sum(rate(http_requests_total{job=\"rest-redis\"}[1m]))",
+          "legendFormat": "REST / Redis", "refId": "C"
+        },
+        {
+          "expr": "sum(rate(grpc_postgres_requests_total[1m]))",
+          "legendFormat": "gRPC / Postgres", "refId": "D"
+        },
+        {
+          "expr": "sum(rate(grpc_mongo_requests_total[1m]))",
+          "legendFormat": "gRPC / Mongo", "refId": "E"
+        },
+        {
+          "expr": "sum(rate(grpc_redis_requests_total[1m]))",
+          "legendFormat": "gRPC / Redis", "refId": "F"
+        }
+      ],
+      "title": "Request Rate — all services",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Total requests processed since last restart.",
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
+      "id": 4,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "area" },
+      "targets": [
+        { "expr": "sum(http_requests_total{job=\"rest-postgres\"})", "legendFormat": "REST/PG", "refId": "A" },
+        { "expr": "sum(http_requests_total{job=\"rest-mongo\"})",    "legendFormat": "REST/MG", "refId": "B" },
+        { "expr": "sum(http_requests_total{job=\"rest-redis\"})",   "legendFormat": "REST/RD", "refId": "C" },
+        { "expr": "sum(grpc_postgres_requests_total)",             "legendFormat": "gRPC/PG", "refId": "D" },
+        { "expr": "sum(grpc_mongo_requests_total)",                "legendFormat": "gRPC/MG", "refId": "E" },
+        { "expr": "sum(grpc_redis_requests_total)",                "legendFormat": "gRPC/RD", "refId": "F" }
+      ],
+      "title": "Total Requests",
+      "type": "stat"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "id": 102,
+      "title": "🔴 SIGNAL 3 — Errors",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Error rate = errors / total requests. REST suite uses HTTP 5xx status. gRPC suite uses explicit error counters.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 15 },
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "id": 5,
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "mean", "max"] } },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=\"rest-postgres\",status=~\"5..\"}[1m])) / sum(rate(http_requests_total{job=\"rest-postgres\"}[1m]))",
+          "legendFormat": "REST / Postgres", "refId": "A"
+        },
+        {
+          "expr": "sum(rate(http_requests_total{job=\"rest-mongo\",status=~\"5..\"}[1m])) / sum(rate(http_requests_total{job=\"rest-mongo\"}[1m]))",
+          "legendFormat": "REST / Mongo", "refId": "B"
+        },
+        {
+          "expr": "sum(rate(http_requests_total{job=\"rest-redis\",status=~\"5..\"}[1m])) / sum(rate(http_requests_total{job=\"rest-redis\"}[1m]))",
+          "legendFormat": "REST / Redis", "refId": "C"
+        },
+        {
+          "expr": "sum(rate(grpc_postgres_errors_total[1m])) / sum(rate(grpc_postgres_requests_total[1m]))",
+          "legendFormat": "gRPC / Postgres", "refId": "D"
+        },
+        {
+          "expr": "sum(rate(grpc_mongo_errors_total[1m])) / sum(rate(grpc_mongo_requests_total[1m]))",
+          "legendFormat": "gRPC / Mongo", "refId": "E"
+        },
+        {
+          "expr": "sum(rate(grpc_redis_errors_total[1m])) / sum(rate(grpc_redis_requests_total[1m]))",
+          "legendFormat": "gRPC / Redis", "refId": "F"
+        }
+      ],
+      "title": "Error Rate — all services",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Absolute error counts per service.",
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+      "id": 6,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none" },
+      "targets": [
+        { "expr": "sum(http_requests_total{job=\"rest-postgres\",status=~\"5..\"})", "legendFormat": "REST/PG 5xx", "refId": "A" },
+        { "expr": "sum(http_requests_total{job=\"rest-mongo\",status=~\"5..\"})",    "legendFormat": "REST/MG 5xx", "refId": "B" },
+        { "expr": "sum(http_requests_total{job=\"rest-redis\",status=~\"5..\"})",   "legendFormat": "REST/RD 5xx", "refId": "C" },
+        { "expr": "sum(grpc_postgres_errors_total)", "legendFormat": "gRPC/PG ERR", "refId": "D" },
+        { "expr": "sum(grpc_mongo_errors_total)",    "legendFormat": "gRPC/MG ERR", "refId": "E" },
+        { "expr": "sum(grpc_redis_errors_total)",    "legendFormat": "gRPC/RD ERR", "refId": "F" }
+      ],
+      "title": "Total Errors",
+      "type": "stat"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "id": 103,
+      "title": "🟡 SIGNAL 4 — Saturation (in-flight requests)",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Number of requests currently being processed (in-flight). High saturation means the service is under heavy load.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 20 },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "id": 7,
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "mean", "max"] } },
+      "targets": [
+        { "expr": "http_requests_in_progress{job=\"rest-postgres\"}", "legendFormat": "REST / Postgres", "refId": "A" },
+        { "expr": "http_requests_in_progress{job=\"rest-mongo\"}",    "legendFormat": "REST / Mongo",    "refId": "B" },
+        { "expr": "http_requests_in_progress{job=\"rest-redis\"}",   "legendFormat": "REST / Redis",    "refId": "C" }
+      ],
+      "title": "In-flight Requests (REST suite) — Saturation",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "id": 104,
+      "title": "📊 Latency Distribution Table (current snapshot)",
+      "type": "row"
+    },
+
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Point-in-time latency percentiles for every service — useful for a quick side-by-side comparison.",
+      "fieldConfig": {
+        "defaults": { "unit": "s", "decimals": 4 },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Service" }, "properties": [{ "id": "custom.width", "value": 200 }] }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 37 },
+      "id": 8,
+      "options": { "showHeader": true, "sortBy": [{ "displayName": "p99", "desc": true }] },
+      "targets": [
+        {
+          "expr": "label_replace(histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"rest-postgres\"}[2m])) by (le)), \"service\", \"REST / Postgres\", \"\", \"\")",
+          "legendFormat": "REST / Postgres", "refId": "A", "instant": true, "format": "table"
+        },
+        {
+          "expr": "label_replace(histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"rest-mongo\"}[2m])) by (le)), \"service\", \"REST / Mongo\", \"\", \"\")",
+          "legendFormat": "REST / Mongo", "refId": "B", "instant": true, "format": "table"
+        },
+        {
+          "expr": "label_replace(histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"rest-redis\"}[2m])) by (le)), \"service\", \"REST / Redis\", \"\", \"\")",
+          "legendFormat": "REST / Redis", "refId": "C", "instant": true, "format": "table"
+        },
+        {
+          "expr": "label_replace(histogram_quantile(0.50, sum(rate(grpc_postgres_latency_seconds_bucket[2m])) by (le)), \"service\", \"gRPC / Postgres\", \"\", \"\")",
+          "legendFormat": "gRPC / Postgres", "refId": "D", "instant": true, "format": "table"
+        },
+        {
+          "expr": "label_replace(histogram_quantile(0.50, sum(rate(grpc_mongo_latency_seconds_bucket[2m])) by (le)), \"service\", \"gRPC / Mongo\", \"\", \"\")",
+          "legendFormat": "gRPC / Mongo", "refId": "E", "instant": true, "format": "table"
+        },
+        {
+          "expr": "label_replace(histogram_quantile(0.50, sum(rate(grpc_redis_latency_seconds_bucket[2m])) by (le)), \"service\", \"gRPC / Redis\", \"\", \"\")",
+          "legendFormat": "gRPC / Redis", "refId": "F", "instant": true, "format": "table"
+        }
+      ],
+      "title": "Latency Snapshot (p50 / p95 / p99) — all services",
+      "type": "table",
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": { "legendFormat": "Service", "Value": "p50 (s)" }
+          }
+        }
+      ]
+    }
+
+  ],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "tags": ["protocolshift", "benchmark", "rest", "grpc"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "ProtocolShift — REST vs gRPC Benchmark",
+  "uid": "protocolshift-main",
+  "version": 1
+}
