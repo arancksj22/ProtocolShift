@@ -7,7 +7,10 @@ pydantic-settings==2.2.1
 asyncpg==0.29.0
 
 # MongoDB
+# motor 3.4.0 requires pymongo<4.9 — pin explicitly to avoid the
+# _QUERY_OPTIONS ImportError introduced in pymongo 4.9.0
 motor==3.4.0
+pymongo==4.8.0
 
 # Redis
 redis[asyncio]==5.0.3

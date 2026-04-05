@@ -2,15 +2,17 @@ grpcio==1.63.0
 grpcio-tools==1.63.0
 grpcio-reflection==1.63.0
 
-# protobuf version is NOT pinned — grpcio-tools 1.63.0 requires >=5.26.1,<6.0
-# and will pull the right version automatically
+# protobuf: grpcio-tools 1.63.0 requires >=5.26.1,<6.0
 protobuf>=5.26.1,<6.0
 
 # PostgreSQL
 asyncpg==0.29.0
 
 # MongoDB
+# motor 3.4.0 requires pymongo<4.9 — pin explicitly to avoid the
+# _QUERY_OPTIONS ImportError introduced in pymongo 4.9.0
 motor==3.4.0
+pymongo==4.8.0
 
 # Redis
 redis[asyncio]==5.0.3
