@@ -82,8 +82,8 @@ services:
   # ──────────────────────────────────────────
   rest-postgres:
     build:
-      context: ./services/rest-suite
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: rest-suite/Dockerfile
     command: ["uvicorn", "postgres_service:app", "--host", "0.0.0.0", "--port", "8001"]
     environment:
       <<: *postgres-env
@@ -96,8 +96,8 @@ services:
 
   rest-mongo:
     build:
-      context: ./services/rest-suite
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: rest-suite/Dockerfile
     command: ["uvicorn", "mongo_service:app", "--host", "0.0.0.0", "--port", "8002"]
     environment:
       <<: *mongo-env
@@ -110,8 +110,8 @@ services:
 
   rest-redis:
     build:
-      context: ./services/rest-suite
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: rest-suite/Dockerfile
     command: ["uvicorn", "redis_service:app", "--host", "0.0.0.0", "--port", "8003"]
     environment:
       <<: *redis-env
@@ -127,8 +127,8 @@ services:
   # ──────────────────────────────────────────
   grpc-postgres:
     build:
-      context: ./services/grpc-suite
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: grpc-suite/Dockerfile
     command: ["python", "postgres_service.py"]
     environment:
       <<: *postgres-env
@@ -144,8 +144,8 @@ services:
 
   grpc-mongo:
     build:
-      context: ./services/grpc-suite
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: grpc-suite/Dockerfile
     command: ["python", "mongo_service.py"]
     environment:
       <<: *mongo-env
@@ -161,8 +161,8 @@ services:
 
   grpc-redis:
     build:
-      context: ./services/grpc-suite
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: grpc-suite/Dockerfile
     command: ["python", "redis_service.py"]
     environment:
       <<: *redis-env

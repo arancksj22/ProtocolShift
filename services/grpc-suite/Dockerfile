@@ -2,18 +2,17 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install grpc tools + service deps
-COPY requirements.txt .
+COPY grpc-suite/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy proto and all service files
-COPY ../protobufs/benchmark.proto ./benchmark.proto
-COPY postgres_service.py .
-COPY mongo_service.py .
-COPY redis_service.py .
+# Copy the proto and all service files
+COPY protobufs/benchmark.proto ./benchmark.proto
+COPY grpc-suite/postgres_service.py .
+COPY grpc-suite/mongo_service.py .
+COPY grpc-suite/redis_service.py .
 
-# Generate Python stubs from the proto at build time
-# (avoids needing to run generate_stubs.sh manually)
+# Generate Python stubs from the proto at build time —
+# no manual generate_stubs.sh step needed when using docker-compose
 RUN python -m grpc_tools.protoc \
       -I . \
       -I "$(python -c 'import grpc_tools, os; print(os.path.dirname(grpc_tools.__file__))')" \
