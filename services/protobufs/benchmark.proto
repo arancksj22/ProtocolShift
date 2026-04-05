@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package benchmark;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// ──────────────────────────────────────────────
+// Shared data model — used identically in REST
+// (via Pydantic) and gRPC (via this message).
+// ──────────────────────────────────────────────
+message BenchmarkRecord {
+  string id          = 1;   // UUID string
+  string name        = 2;
+  double value       = 3;
+  string payload     = 4;   // variable-length blob to stress serialization
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+// ──────────────────────────────────────────────
+// Request/Response wrappers
+// ──────────────────────────────────────────────
+message CreateRecordRequest {
+  string name    = 1;
+  double value   = 2;
+  string payload = 3;
+}
+
+message GetRecordRequest {
+  string id = 1;
+}
+
+message UpdateRecordRequest {
+  string id      = 1;
+  string name    = 2;
+  double value   = 3;
+  string payload = 4;
+}
+
+message DeleteRecordRequest {
+  string id = 1;
+}
+
+message DeleteRecordResponse {
+  bool success = 1;
+  string id    = 2;
+}
+
+message ListRecordsRequest {
+  int32 limit  = 1;   // 0 = use server default (100)
+  int32 offset = 2;
+}
+
+message ListRecordsResponse {
+  repeated BenchmarkRecord records = 1;
+  int32 total                      = 2;
+}
+
+// ──────────────────────────────────────────────
+// Service definition — implements 5 CRUD RPCs.
+// Mirrored exactly by REST suite via HTTP verbs.
+// ──────────────────────────────────────────────
+service BenchmarkService {
+  // POST   /records
+  rpc Create(CreateRecordRequest) returns (BenchmarkRecord);
+
+  // GET    /records/{id}
+  rpc Read(GetRecordRequest) returns (BenchmarkRecord);
+
+  // GET    /records
+  rpc ReadAll(ListRecordsRequest) returns (ListRecordsResponse);
+
+  // PUT    /records/{id}
+  rpc Update(UpdateRecordRequest) returns (BenchmarkRecord);
+
+  // DELETE /records/{id}
+  rpc Delete(DeleteRecordRequest) returns (DeleteRecordResponse);
+}

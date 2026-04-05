@@ -1,0 +1,19 @@
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+pydantic==2.7.1
+pydantic-settings==2.2.1
+
+# PostgreSQL
+asyncpg==0.29.0
+
+# MongoDB
+motor==3.4.0
+
+# Redis
+redis[asyncio]==5.0.3
+
+# Observability
+prometheus-fastapi-instrumentator==6.1.0
+
+# Utilities
+python-dotenv==1.0.1
