@@ -27,6 +27,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import ReturnDocument
 from prometheus_fastapi_instrumentator import Instrumentator
 
 load_dotenv()
@@ -100,7 +101,7 @@ async def _next_id() -> int:
         {"_id": "benchmark_records"},
         {"$inc": {"seq": 1}},
         upsert=True,
-        return_document=True,
+        return_document=ReturnDocument.AFTER,
     )
     return result["seq"]
 
@@ -155,7 +156,7 @@ async def update_record(record_id: int, body: BenchmarkRecordUpdate) -> Benchmar
         {"id": record_id},
         {"$set": {"payload": body.payload}},
         projection={"_id": 0},
-        return_document=True,
+        return_document=ReturnDocument.AFTER,
     )
     if result is None:
         raise HTTPException(status_code=404, detail=f"Record {record_id} not found.")

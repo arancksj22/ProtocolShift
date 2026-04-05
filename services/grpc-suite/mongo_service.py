@@ -28,6 +28,7 @@ import grpc
 from dotenv import load_dotenv
 from grpc_reflection.v1alpha import reflection
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
+from pymongo import ReturnDocument
 from prometheus_client import Counter, Histogram, start_http_server
 
 import benchmark_pb2
@@ -182,7 +183,7 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
                     {"id": request.id},
                     {"$set": {"payload": request.payload}},
                     projection={"_id": 0},
-                    return_document=True,
+                    return_document=ReturnDocument.AFTER,
                 )
                 if result is None:
                     await context.abort(
