@@ -143,19 +143,19 @@ function Test-RestService($name, $base) {
 # ---------------------------------------------------------
 # gRPC test runner (requires grpcurl on PATH)
 # ---------------------------------------------------------
-function Invoke-Grpc($host, $rpc, $data) {
+function Invoke-Grpc($address, $rpc, $data) {
     $json = $data | ConvertTo-Json -Compress
-    $raw  = grpcurl -plaintext -d $json $host "benchmark.BenchmarkService/$rpc" 2>&1
+    $raw  = grpcurl -plaintext -d $json $address "benchmark.BenchmarkService/$rpc" 2>&1
     if ($LASTEXITCODE -ne 0) { return $null }
     try   { return $raw | ConvertFrom-Json }
     catch { return $null }
 }
 
-function Test-GrpcService($name, $host) {
-    Header "gRPC -- $name  ($host)"
+function Test-GrpcService($name, $address) {
+    Header "gRPC -- $name  ($address)"
 
     Section "Create RPC"
-    $created = Invoke-Grpc $host "Create" @{ payload = "benchmark-smoke-test" }
+    $created = Invoke-Grpc $address "Create" @{ payload = "benchmark-smoke-test" }
     if ($created -and ($null -ne $created.id) -and $created.payload -eq "benchmark-smoke-test") {
         Pass "Create  -->  id=$($created.id)"
     }
@@ -166,7 +166,7 @@ function Test-GrpcService($name, $host) {
     $id = [int]$created.id
 
     Section "Read RPC"
-    $read = Invoke-Grpc $host "Read" @{ id = $id }
+    $read = Invoke-Grpc $address "Read" @{ id = $id }
     if ($read -and [int]$read.id -eq $id -and $read.payload -eq "benchmark-smoke-test") {
         Pass "Read    -->  id=$id  payload='$($read.payload)'"
     }
@@ -175,7 +175,7 @@ function Test-GrpcService($name, $host) {
     }
 
     Section "ReadAll RPC"
-    $list = Invoke-Grpc $host "ReadAll" @{ limit = 10; offset = 0 }
+    $list = Invoke-Grpc $address "ReadAll" @{ limit = 10; offset = 0 }
     if ($list -and [int]$list.total -ge 1) {
         Pass "ReadAll -->  total=$($list.total)"
     }
@@ -184,7 +184,7 @@ function Test-GrpcService($name, $host) {
     }
 
     Section "Update RPC"
-    $updated = Invoke-Grpc $host "Update" @{ id = $id; payload = "updated-smoke-test" }
+    $updated = Invoke-Grpc $address "Update" @{ id = $id; payload = "updated-smoke-test" }
     if ($updated -and $updated.payload -eq "updated-smoke-test") {
         Pass "Update  -->  payload='$($updated.payload)'"
     }
@@ -193,7 +193,7 @@ function Test-GrpcService($name, $host) {
     }
 
     Section "Delete RPC"
-    $deleted = Invoke-Grpc $host "Delete" @{ id = $id }
+    $deleted = Invoke-Grpc $address "Delete" @{ id = $id }
     if ($deleted -and $deleted.success -eq $true) {
         Pass "Delete  -->  id=$id removed"
     }
@@ -202,7 +202,7 @@ function Test-GrpcService($name, $host) {
     }
 
     Section "Read after Delete (expect NOT_FOUND)"
-    $gone = grpcurl -plaintext -d "{`"id`": $id}" $host "benchmark.BenchmarkService/Read" 2>&1
+    $gone = grpcurl -plaintext -d "{`"id`": $id}" $address "benchmark.BenchmarkService/Read" 2>&1
     if ($gone -match "NOT_FOUND") {
         Pass "NOT_FOUND confirmed -- record correctly removed"
     }
