@@ -145,10 +145,12 @@ function Test-RestService($name, $base) {
 # ---------------------------------------------------------
 function Invoke-Grpc($address, $rpc, $data) {
     $json = $data | ConvertTo-Json -Compress
-    $raw  = grpcurl -plaintext -d $json $address "benchmark.BenchmarkService/$rpc" 2>&1
-    if ($LASTEXITCODE -ne 0) { return $null }
+    # Wrap in single quotes so PowerShell doesn't strip the double quotes inside the JSON
+    $jsonArg = "'$json'"
+    $raw = Invoke-Expression "grpcurl -plaintext -d $jsonArg $address `"benchmark.BenchmarkService/$rpc`" 2>&1"
+    if ($LASTEXITCODE -ne 0) { return "ERROR: $raw" }
     try   { return $raw | ConvertFrom-Json }
-    catch { return $null }
+    catch { return "JSON PARSE ERROR: $raw" }
 }
 
 function Test-GrpcService($name, $address) {
