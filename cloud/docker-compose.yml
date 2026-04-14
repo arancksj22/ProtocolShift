@@ -1,0 +1,134 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# ProtocolShift — Cloud Backend docker-compose
+#
+# Run from the cloud/ directory:  docker compose --env-file .env up --build
+#
+# Brings up:
+#   REST suite   : rest-postgres (:8001), rest-mongo (:8002), rest-redis (:8003)
+#   gRPC suite   : grpc-postgres (:50051), grpc-mongo (:50052), grpc-redis (:50053)
+#   Observability: prometheus (:9090), grafana (:3000)
+# ──────────────────────────────────────────────────────────────────────────────
+
+networks:
+  bench:
+    driver: bridge
+
+services:
+
+  # ──────────────────────────────────────────
+  # REST suite
+  # Build context is ../local/services
+  # ──────────────────────────────────────────
+  rest-postgres:
+    build:
+      context: ../local/services
+      dockerfile: rest-suite/Dockerfile
+    command: ["uvicorn", "postgres_service:app", "--host", "0.0.0.0", "--port", "8001"]
+    env_file:
+      - .env
+    ports:
+      - "8001:8001"
+    networks: [bench]
+
+  rest-mongo:
+    build:
+      context: ../local/services
+      dockerfile: rest-suite/Dockerfile
+    command: ["uvicorn", "mongo_service:app", "--host", "0.0.0.0", "--port", "8002"]
+    env_file:
+      - .env
+    ports:
+      - "8002:8002"
+    networks: [bench]
+
+  rest-redis:
+    build:
+      context: ../local/services
+      dockerfile: rest-suite/Dockerfile
+    command: ["uvicorn", "redis_service:app", "--host", "0.0.0.0", "--port", "8003"]
+    env_file:
+      - .env
+    ports:
+      - "8003:8003"
+    networks: [bench]
+
+  # ──────────────────────────────────────────
+  # gRPC suite
+  # ──────────────────────────────────────────
+  grpc-postgres:
+    build:
+      context: ../local/services
+      dockerfile: grpc-suite/Dockerfile
+    command: ["python", "postgres_service.py"]
+    env_file:
+      - .env
+    environment:
+      GRPC_POSTGRES_PORT:         "50051"
+      GRPC_POSTGRES_METRICS_PORT: "50061"
+    ports:
+      - "50051:50051"
+      - "50061:50061"
+    networks: [bench]
+
+  grpc-mongo:
+    build:
+      context: ../local/services
+      dockerfile: grpc-suite/Dockerfile
+    command: ["python", "mongo_service.py"]
+    env_file:
+      - .env
+    environment:
+      GRPC_MONGO_PORT:         "50052"
+      GRPC_MONGO_METRICS_PORT: "50062"
+    ports:
+      - "50052:50052"
+      - "50062:50062"
+    networks: [bench]
+
+  grpc-redis:
+    build:
+      context: ../local/services
+      dockerfile: grpc-suite/Dockerfile
+    command: ["python", "redis_service.py"]
+    env_file:
+      - .env
+    environment:
+      GRPC_REDIS_PORT:         "50053"
+      GRPC_REDIS_METRICS_PORT: "50063"
+    ports:
+      - "50053:50053"
+      - "50063:50063"
+    networks: [bench]
+
+  # ──────────────────────────────────────────
+  # Observability stack
+  # ──────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    restart: unless-stopped
+    volumes:
+      - ../local/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    networks: [bench]
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "protocolshift"
+      GF_AUTH_ANONYMOUS_ENABLED:  "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      GF_PATHS_PROVISIONING: "/etc/grafana/provisioning"
+    volumes:
+      - ../local/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../local/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    networks: [bench]
+    depends_on:
+      - prometheus

@@ -89,20 +89,29 @@ This automatically runs all 5 CRUD operations (Create, Read, List, Update, Delet
 
 ## Step 4 — Generate load for the dashboard
 
-The dashboard needs traffic data to draw graphs. Run this in your second terminal — it fires 200 requests at each backend:
+The dashboard needs traffic data to draw graphs. Run this in your second terminal — it uses background jobs to fire 200 requests at all REST and gRPC backends simultaneously:
 
 ```powershell
-1..200 | ForEach-Object {
-    Invoke-RestMethod -Method POST -Uri "http://localhost:8001/records" `
-        -ContentType "application/json" `
-        -Body '{"payload":"load-test-payload-goes-here-to-stress-serialisation"}' | Out-Null
-    Invoke-RestMethod -Method POST -Uri "http://localhost:8002/records" `
-        -ContentType "application/json" `
-        -Body '{"payload":"load-test-payload-goes-here-to-stress-serialisation"}' | Out-Null
-    Invoke-RestMethod -Method POST -Uri "http://localhost:8003/records" `
-        -ContentType "application/json" `
-        -Body '{"payload":"load-test-payload-goes-here-to-stress-serialisation"}' | Out-Null
+# Generate REST and gRPC load simultaneously
+$restJob = Start-Job {
+    1..200 | ForEach-Object {
+        Invoke-RestMethod -Method POST -Uri "http://localhost:8001/records" -ContentType "application/json" -Body '{"payload":"load-test-payload-goes-here-to-stress-serialisation"}' | Out-Null
+        Invoke-RestMethod -Method POST -Uri "http://localhost:8002/records" -ContentType "application/json" -Body '{"payload":"load-test-payload-goes-here-to-stress-serialisation"}' | Out-Null
+        Invoke-RestMethod -Method POST -Uri "http://localhost:8003/records" -ContentType "application/json" -Body '{"payload":"load-test-payload-goes-here-to-stress-serialisation"}' | Out-Null
+    }
 }
+
+$grpcJob = Start-Job {
+    1..200 | ForEach-Object {
+        grpcurl -plaintext -d '{\"payload\": \"load-test-payload-goes-here-to-stress-serialisation\"}' localhost:50051 benchmark.BenchmarkService/Create
+        grpcurl -plaintext -d '{\"payload\": \"load-test-payload-goes-here-to-stress-serialisation\"}' localhost:50052 benchmark.BenchmarkService/Create
+        grpcurl -plaintext -d '{\"payload\": \"load-test-payload-goes-here-to-stress-serialisation\"}' localhost:50053 benchmark.BenchmarkService/Create
+    } | Out-Null
+}
+
+# Wait for both protocols to finish blasting traffic
+Wait-Job -Job $restJob, $grpcJob
+Receive-Job -Job $restJob, $grpcJob
 Write-Host "Done — open Grafana!"
 ```
 
