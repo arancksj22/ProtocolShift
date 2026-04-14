@@ -70,14 +70,6 @@ Wait-Job -Job $restJob, $grpcJob
 Receive-Job -Job $restJob, $grpcJob
 ```
 
-```powershell
-1..200 | ForEach-Object {
-    grpcurl -plaintext -d '{\"payload\": \"stress-test-grpc\"}' localhost:50051 benchmark.BenchmarkService/Create
-    grpcurl -plaintext -d '{\"payload\": \"stress-test-grpc\"}' localhost:50052 benchmark.BenchmarkService/Create
-    grpcurl -plaintext -d '{\"payload\": \"stress-test-grpc\"}' localhost:50053 benchmark.BenchmarkService/Create
-} | Out-Null
-```
-
 ---
 
 ## Step 3 — View Latency Over Cloud
