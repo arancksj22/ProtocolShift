@@ -2,6 +2,10 @@
 
 ProtocolShift is a controlled experimental testbed designed to isolate the performance difference between HTTP/1.1 REST and gRPC. By separating transport and serialization overhead from application logic and database I/O, the project quantifies the serialization tax and head of line blocking in high concurrency environments.
 
+## Architecture Diagram
+
+![ProtocolShift Architecture](docs/architecture%20diagram%20protocal%20shift.jfif)
+
 ## Research Objectives
 
 The project evaluates protocol efficiency across three distinct database paradigms to address critical research gaps:
