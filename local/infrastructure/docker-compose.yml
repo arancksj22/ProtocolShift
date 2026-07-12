@@ -39,6 +39,15 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    # pg_stat_statements enables per-query execution-time profiling used by
+    # the benchmark harness (benchmark/profiling.py) to separate DB time
+    # from protocol/serialization time.
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "pg_stat_statements.track=all"
     environment:
       POSTGRES_USER:     postgres
       POSTGRES_PASSWORD: postgres
@@ -88,6 +97,8 @@ services:
     ports:
       - "8001:8001"
     networks: [bench]
+    # SYS_PTRACE lets benchmark/pyspy_profile.py attach py-spy for flame graphs
+    cap_add: [SYS_PTRACE]
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,6 +113,7 @@ services:
     ports:
       - "8002:8002"
     networks: [bench]
+    cap_add: [SYS_PTRACE]
     depends_on:
       mongo:
         condition: service_healthy
@@ -116,6 +128,7 @@ services:
     ports:
       - "8003:8003"
     networks: [bench]
+    cap_add: [SYS_PTRACE]
     depends_on:
       redis:
         condition: service_healthy
@@ -137,6 +150,7 @@ services:
       - "50051:50051"
       - "50061:50061"
     networks: [bench]
+    cap_add: [SYS_PTRACE]
     depends_on:
       postgres:
         condition: service_healthy
@@ -154,6 +168,7 @@ services:
       - "50052:50052"
       - "50062:50062"
     networks: [bench]
+    cap_add: [SYS_PTRACE]
     depends_on:
       mongo:
         condition: service_healthy
@@ -171,6 +186,7 @@ services:
       - "50053:50053"
       - "50063:50063"
     networks: [bench]
+    cap_add: [SYS_PTRACE]
     depends_on:
       redis:
         condition: service_healthy

@@ -53,10 +53,42 @@ The core BenchmarkRecord object is mirrored exactly in both suites:
 * id (int32): Unique identifier assigned by the storage backend.
 * payload (string): Arbitrary string data used to test serialization overhead.
 
+## Benchmark Harness
+
+The `benchmark/` directory contains the load-generation and analysis toolchain
+used to produce statistically rigorous results (see `HOW_TO_RUN.md` for the
+full walkthrough):
+
+* Controlled load generation: configurable concurrency levels, payload sizes,
+  warm-up, and duration. gRPC is driven over a persistent multiplexed HTTP/2
+  channel and REST over a persistent connection pool, so protocol behavior is
+  measured rather than client-tooling overhead.
+* Repeated trials with database flushing between runs, producing 95%
+  confidence intervals, variance/CoV, and Mann-Whitney U significance tests
+  for every REST-vs-gRPC comparison.
+* Profiling evidence: per-query database execution time via
+  pg_stat_statements, container-level CPU/memory/network sampling, and py-spy
+  flame graphs — used to investigate the PostgreSQL anomaly (gRPC
+  underperforming REST on the heavy-compute tier).
+* Reproducibility capture: every campaign records host hardware, Docker engine
+  resources, image digests, and dependency versions in `environment.json`.
+* A formal Protocol Migration Threshold model: three numerical gates
+  (p99 improvement, statistical robustness, Amdahl DB-share) evaluated
+  directly against the measured data.
+
 ## Repository Structure
 
 ```
 .
+├── run_all.py                  # One-command runner: Docker + stack + campaign + analysis
+├── HOW_TO_RUN.md               # Step-by-step benchmark campaign guide
+├── benchmark/                  # Load-generation & analysis harness
+│   ├── loadgen.py              # Async closed-loop load generator (REST + gRPC)
+│   ├── run_trials.py           # Repeated-trials campaign runner
+│   ├── analyze.py              # CIs, significance tests, plots, migration report
+│   ├── profiling.py            # docker stats + pg_stat_statements instruments
+│   ├── pyspy_profile.py        # Flame graphs of running service containers
+│   └── capture_env.py          # Hardware/software environment capture
 ├── cloud/                      # Cloud benchmark environment
 │   ├── docker-compose.yml      # Orchestration for cloud connected services
 │   ├── test_all.ps1            # Validation scripts for cloud tests
@@ -65,6 +97,7 @@ The core BenchmarkRecord object is mirrored exactly in both suites:
 │   ├── local_results/          # Local execution latency plots
 │   ├── cloud_results/          # Cloud execution latency plots
 │   └── FINALDOCUMENT.txt       # Comprehensive research paper
+├── results/                    # Benchmark campaign outputs (gitignored)
 └── local/                      # Local benchmark environment
     ├── RUNNING.md              # Local specific setup instructions
     ├── test_all.ps1            # Smoke test for all local services
@@ -79,6 +112,17 @@ The core BenchmarkRecord object is mirrored exactly in both suites:
 ```
 
 ## Getting Started
+
+Fastest path — one command from the repo root (starts Docker, installs
+dependencies, builds the stack, runs a benchmark campaign, analyzes it):
+
+```
+python run_all.py           # quick sanity campaign
+python run_all.py --full    # full 5-trial campaign with profiling
+```
+
+For the full benchmark workflow (repeated trials, statistics, profiling), see
+**HOW_TO_RUN.md**. To just bring the testbed up manually:
 
 1. Navigate to the local infrastructure directory: cd local/infrastructure
 2. Start the testbed: docker compose up --build

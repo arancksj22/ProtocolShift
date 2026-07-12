@@ -8,9 +8,15 @@ ProtocolShift is a research benchmarking testbed (research paper in `docs/FINALD
 
 ## Commands
 
-All orchestration is Docker Compose; there is no package.json / Makefile / pytest suite.
+All orchestration is Docker Compose; there is no package.json / Makefile / pytest suite. The benchmark harness (`benchmark/`) is plain Python run from a venv.
 
 ```powershell
+# One-command path (repo root): Docker engine + venv + stack + campaign + analysis
+python run_all.py                  # quick sanity campaign (~2 min once built)
+python run_all.py --full           # full 5-trial campaign with profiling
+python run_all.py --stack-only     # just bring the stack up
+python run_all.py --down           # tear the stack down
+
 # Local benchmark (databases run in Docker)
 cd local/infrastructure
 docker compose up --build          # start everything
@@ -31,6 +37,15 @@ docker compose --env-file .env up --build   # requires cloud/.env with POSTGRES_
 # stubs at build time)
 cd local/services
 bash grpc-suite/generate_stubs.sh  # writes benchmark_pb2.py / benchmark_pb2_grpc.py into grpc-suite/
+
+# Benchmark harness (full guide: HOW_TO_RUN.md; needs the stack up first)
+python -m venv .venv && .venv\Scripts\pip install -r benchmark\requirements.txt
+cd benchmark
+python run_trials.py --quick          # ~1-min sanity campaign
+python run_trials.py --profile        # full campaign: 5 trials × all cells + profiling
+python analyze.py ..\results\<run_id> # CIs, MWU tests, plots, migration report
+python loadgen.py --suite grpc --backend redis --concurrency 50 --duration 10  # single ad-hoc run
+python pyspy_profile.py --service grpc-postgres --duration 30  # flame graph (load in 2nd terminal)
 ```
 
 Manual gRPC calls use grpcurl (server reflection is enabled):
@@ -59,6 +74,17 @@ Deliberate design constraints (do not "improve" these away — they exist to kee
 - **Fully async everywhere** (async/await, connection pools of 2–10 created at startup).
 - **Identical logic across suites**: any change to a REST service's queries, storage layout, error semantics, or metrics granularity must be applied to the corresponding gRPC service (and vice versa), or the benchmark comparison is invalidated. E.g. both Redis services use the same key scheme: atomic `INCR benchmark:counter` for ids, hash at `benchmark:<id>`, sorted set `benchmark:index` for pagination; both Mongo services use a `benchmark_counters` collection with `find_one_and_update` upsert for auto-increment ids.
 - **Consistent metric naming**: `{suite}_{backend}_requests_total`, `..._latency_seconds` (Histogram with fixed buckets 0.001–2.5s, labeled by `method`), `..._errors_total`. The Grafana dashboard (`local/monitoring/grafana/dashboards/protocolshift_benchmark.json`) and Prometheus scrape jobs (`local/monitoring/prometheus/prometheus.yml`, labels `suite`/`backend`) depend on these names — change them in lockstep.
+
+### Benchmark harness (`benchmark/`)
+
+Self-contained Python toolchain that replaced the old PowerShell/grpcurl load loops (grpcurl spawned a process + new HTTP/2 connection per request — a confound the paper's reviewers flagged). Key pieces:
+
+- `loadgen.py`: closed-loop async load generator. REST via one `httpx.AsyncClient` pool, gRPC via one persistent `grpc.aio` channel. Records raw per-request latencies client-side; configurable concurrency/payload-bytes/duration/warmup/op-mix. Generates its own protobuf stubs from `local/services/protobufs/benchmark.proto` on first import (`stubs.py`; the generated `benchmark_pb2*.py` are gitignored).
+- `run_trials.py`: campaign runner — N trials per (suite × backend × concurrency × payload) cell, flushes DBs between trials via `docker compose exec` (no DB ports need publishing), captures `environment.json`, optionally samples `docker stats` and `pg_stat_statements` (`--profile`). Results go to `results/<run_id>/` (gitignored).
+- `analyze.py`: trial-level 95% t-CIs, CoV, Mann-Whitney U (pooled latencies), matplotlib plots, and `migration_decision.md` — a 3-gate Phase-Gate model (p99 improvement ≥ X%, disjoint CIs + MWU p<0.01, DB-time share < Y% from pg_stat). CIs are computed across trials, not within (per-request samples are autocorrelated).
+- `profiling.py` / `pyspy_profile.py`: pg_stat_statements snapshots (separates DB execution time from protocol time — the core of the PostgreSQL-anomaly investigation) and py-spy flame graphs.
+
+Compose support for profiling (local only): postgres starts with `shared_preload_libraries=pg_stat_statements`, and all six app services have `cap_add: [SYS_PTRACE]` for py-spy. A stack started from the older compose file needs `--force-recreate` before `--profile` works.
 
 ### local/ vs cloud/
 
