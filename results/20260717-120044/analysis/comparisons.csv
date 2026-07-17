@@ -1,0 +1,4 @@
+backend,concurrency,payload_bytes,rest_p99_ms,rest_p99_ci95,grpc_p99_ms,grpc_p99_ci95,grpc_improvement_pct,mannwhitney_p,ci_verdict
+mongo,10,100,60.5418,—,27.9639,—,53.8105,0.0160,n/a (single trial)
+postgres,10,100,56.8055,—,12.5815,—,77.8516,0.0000,n/a (single trial)
+redis,10,100,52.8828,—,13.9370,—,73.6454,0.0000,n/a (single trial)

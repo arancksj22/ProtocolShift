@@ -1,7 +1,6 @@
 .env
 
 # Benchmark harness artifacts
-results/
 benchmark/benchmark_pb2.py
 benchmark/benchmark_pb2_grpc.py
 benchmark/flame_*.svg

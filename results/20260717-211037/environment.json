@@ -1,0 +1,542 @@
+{
+  "captured_at": "2026-07-17T21:10:37",
+  "host": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "machine": "AMD64",
+    "processor": "AMD64 Family 25 Model 116 Stepping 1, AuthenticAMD",
+    "cpu_count_logical": 16,
+    "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]"
+  },
+  "docker": {
+    "engine": {
+      "ServerVersion": "29.4.1",
+      "OperatingSystem": "Docker Desktop",
+      "OSType": "linux",
+      "Architecture": "x86_64",
+      "NCPU": 16,
+      "MemTotal": 7897952256
+    },
+    "compose_dir": "D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure",
+    "images": [
+      {
+        "ID": "sha256:80ab7e3f09dd84849380f28a47e26e702bf146dc147d24972ff1586fbfbefb1c",
+        "ContainerName": "infrastructure-rest-postgres-1",
+        "Repository": "infrastructure-rest-postgres",
+        "Tag": "latest",
+        "Platform": "linux/amd64",
+        "Size": 207542171,
+        "Created": "2026-07-17T06:30:36.521995627Z",
+        "LastTagTime": "2026-07-17T15:40:36.354696288Z"
+      },
+      {
+        "ID": "sha256:f8f376a74b5a718ef695ca40aec2df9183cb98dfbc418d94e4e26a441b52e838",
+        "ContainerName": "infrastructure-grpc-mongo-1",
+        "Repository": "infrastructure-grpc-mongo",
+        "Tag": "latest",
+        "Platform": "linux/amd64",
+        "Size": 183458739,
+        "Created": "2026-07-17T06:30:32.974080773Z",
+        "LastTagTime": "2026-07-17T15:40:36.369993114Z"
+      },
+      {
+        "ID": "sha256:b386ed24e236db8fb5d57fdcc95bf9bfb4ef6cfbae743b43720d5c875a96d734",
+        "ContainerName": "infrastructure-grpc-postgres-1",
+        "Repository": "infrastructure-grpc-postgres",
+        "Tag": "latest",
+        "Platform": "linux/amd64",
+        "Size": 183458739,
+        "Created": "2026-07-17T06:30:32.974080773Z",
+        "LastTagTime": "2026-07-17T15:40:36.40024449Z"
+      },
+      {
+        "ID": "sha256:de3a4eab8fdfa507ea92aac488b916b08089e515db49b055fe71dfa271ba3a28",
+        "ContainerName": "infrastructure-postgres-1",
+        "Repository": "postgres",
+        "Tag": "16-alpine",
+        "Platform": "linux/amd64",
+        "Size": 294211945,
+        "Created": "2026-07-07T17:47:20.839800572Z"
+      },
+      {
+        "ID": "sha256:487efc0616382465781b8fdc3d6d1db449e6fd80ae23bf48432a2da6b6929908",
+        "ContainerName": "infrastructure-redis-1",
+        "Repository": "redis",
+        "Tag": "7-alpine",
+        "Platform": "linux/amd64",
+        "Size": 39088753,
+        "Created": "2026-05-07T17:34:49.043581139Z"
+      },
+      {
+        "ID": "sha256:679e4be9f9184b60905bc3c9297d293d0070f1d1155017877cf0199b1f1b787c",
+        "ContainerName": "infrastructure-grafana-1",
+        "Repository": "grafana/grafana",
+        "Tag": "10.4.2",
+        "Platform": "linux/amd64",
+        "Size": 429263997,
+        "Created": "2024-04-11T15:01:40.765429859Z"
+      },
+      {
+        "ID": "sha256:5d1cb411640933bd85a7987a0dc9e5cd81516505801521e264156e29c25f8dc3",
+        "ContainerName": "infrastructure-rest-mongo-1",
+        "Repository": "infrastructure-rest-mongo",
+        "Tag": "latest",
+        "Platform": "linux/amd64",
+        "Size": 207542171,
+        "Created": "2026-07-17T06:30:36.521995627Z",
+        "LastTagTime": "2026-07-17T15:40:36.362546959Z"
+      },
+      {
+        "ID": "sha256:1c125983ef20547669a420c7435ef1dac8bb61c2fcfb6a431fedcbb2f86a0100",
+        "ContainerName": "infrastructure-grpc-redis-1",
+        "Repository": "infrastructure-grpc-redis",
+        "Tag": "latest",
+        "Platform": "linux/amd64",
+        "Size": 183458739,
+        "Created": "2026-07-17T06:30:32.974080773Z",
+        "LastTagTime": "2026-07-17T15:40:36.400373169Z"
+      },
+      {
+        "ID": "sha256:051cb67876a609e838c4be62bf88348ba896b8411d17b3221743a1d31466a114",
+        "ContainerName": "infrastructure-prometheus-1",
+        "Repository": "prom/prometheus",
+        "Tag": "v2.51.2",
+        "Platform": "linux/amd64",
+        "Size": 261568140,
+        "Created": "2024-04-10T14:30:09.176613804Z"
+      },
+      {
+        "ID": "sha256:e0e455c30713b97755f3b0c209df1f01d9417344e00866a0417d88301db0f5a6",
+        "ContainerName": "infrastructure-rest-redis-1",
+        "Repository": "infrastructure-rest-redis",
+        "Tag": "latest",
+        "Platform": "linux/amd64",
+        "Size": 207542171,
+        "Created": "2026-07-17T06:30:36.521995627Z",
+        "LastTagTime": "2026-07-17T15:40:36.36621491Z"
+      },
+      {
+        "ID": "sha256:faa77adca8915c6672577288a0a20db7d666de0c872cb2465daea6fd0082e274",
+        "ContainerName": "infrastructure-mongo-1",
+        "Repository": "mongo",
+        "Tag": "7",
+        "Platform": "linux/amd64",
+        "Size": 877656320,
+        "Created": "2026-04-15T20:46:10.379983307Z"
+      }
+    ],
+    "containers": [
+      {
+        "Command": "\"/run.sh\"",
+        "CreatedAt": "2026-07-12 13:02:00 +0530 IST",
+        "ExitCode": 0,
+        "Health": "",
+        "ID": "197df82b3979",
+        "Image": "grafana/grafana:10.4.2",
+        "Labels": "desktop.docker.io/ports.scheme=v2,com.docker.compose.container-number=1,com.docker.compose.depends_on=prometheus:service_started:false,com.docker.compose.image=sha256:679e4be9f9184b60905bc3c9297d293d0070f1d1155017877cf0199b1f1b787c,com.docker.compose.oneoff=False,desktop.docker.io/binds/0/Source=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\monitoring\\grafana\\dashboards,desktop.docker.io/binds/1/Source=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\monitoring\\grafana\\provisioning,desktop.docker.io/binds/1/SourceKind=hostFile,desktop.docker.io/ports/3000/tcp=:3000,maintainer=Grafana Labs <hello@grafana.com>,com.docker.compose.config-hash=011b2e5865ba4e00930c86254e0249c51837d06d4c22856f75f1600f2cab86b2,com.docker.compose.project=infrastructure,com.docker.compose.project.config_files=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure\\docker-compose.yml,com.docker.compose.project.working_dir=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure,desktop.docker.io/binds/0/SourceKind=hostFile,desktop.docker.io/binds/0/Target=/var/lib/grafana/dashboards,desktop.docker.io/binds/1/Target=/etc/grafana/provisioning,com.docker.compose.service=grafana,com.docker.compose.version=5.1.3",
+        "LocalVolumes": "0",
+        "Mounts": "/run/desktop/m\u00e2\u20ac\u00a6,/run/desktop/m\u00e2\u20ac\u00a6",
+        "Name": "infrastructure-grafana-1",
+        "Names": "infrastructure-grafana-1",
+        "Networks": "infrastructure_bench",
+        "Ports": "0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp",
+        "Project": "infrastructure",
+        "Publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 3000,
+            "PublishedPort": 3000,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 3000,
+            "PublishedPort": 3000,
+            "Protocol": "tcp"
+          }
+        ],
+        "RunningFor": "5 days ago",
+        "Service": "grafana",
+        "Size": "0B",
+        "State": "running",
+        "Status": "Up About a minute"
+      },
+      {
+        "Command": "\"python mongo_servic\u00e2\u20ac\u00a6\"",
+        "CreatedAt": "2026-07-17 12:00:37 +0530 IST",
+        "ExitCode": 0,
+        "Health": "",
+        "ID": "6565c871a1ad",
+        "Image": "infrastructure-grpc-mongo",
+        "Labels": "com.docker.compose.project.working_dir=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure,com.docker.compose.service=grpc-mongo,desktop.docker.io/ports/50062/tcp=:50062,com.docker.compose.image=sha256:f8f376a74b5a718ef695ca40aec2df9183cb98dfbc418d94e4e26a441b52e838,com.docker.compose.oneoff=False,com.docker.compose.project=infrastructure,com.docker.compose.project.config_files=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure\\docker-compose.yml,com.docker.compose.replace=grpc-mongo-1,com.docker.compose.version=5.1.3,desktop.docker.io/ports.scheme=v2,desktop.docker.io/ports/50052/tcp=:50052,com.docker.compose.config-hash=73a438a5f32be3a717f2eb2ab50f934d4bd4f4eafc1059fdba473aa7d4bd37e4,com.docker.compose.container-number=1,com.docker.compose.depends_on=mongo:service_healthy:false",
+        "LocalVolumes": "0",
+        "Mounts": "",
+        "Name": "infrastructure-grpc-mongo-1",
+        "Names": "infrastructure-grpc-mongo-1",
+        "Networks": "infrastructure_bench",
+        "Ports": "0.0.0.0:50052->50052/tcp, [::]:50052->50052/tcp, 0.0.0.0:50062->50062/tcp, [::]:50062->50062/tcp",
+        "Project": "infrastructure",
+        "Publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 50052,
+            "PublishedPort": 50052,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 50052,
+            "PublishedPort": 50052,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 50062,
+            "PublishedPort": 50062,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 50062,
+            "PublishedPort": 50062,
+            "Protocol": "tcp"
+          }
+        ],
+        "RunningFor": "9 hours ago",
+        "Service": "grpc-mongo",
+        "Size": "0B",
+        "State": "running",
+        "Status": "Up About a minute"
+      },
+      {
+        "Command": "\"python postgres_ser\u00e2\u20ac\u00a6\"",
+        "CreatedAt": "2026-07-17 12:00:37 +0530 IST",
+        "ExitCode": 0,
+        "Health": "",
+        "ID": "8ad1a4f93537",
+        "Image": "infrastructure-grpc-postgres",
+        "Labels": "com.docker.compose.depends_on=postgres:service_healthy:false,com.docker.compose.project.working_dir=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure,com.docker.compose.version=5.1.3,desktop.docker.io/ports.scheme=v2,desktop.docker.io/ports/50051/tcp=:50051,desktop.docker.io/ports/50061/tcp=:50061,com.docker.compose.config-hash=a9ac3d78b6ed5f8fbdc715a12a354f3024eab7c5b367342bf8509c30cfffa310,com.docker.compose.container-number=1,com.docker.compose.image=sha256:b386ed24e236db8fb5d57fdcc95bf9bfb4ef6cfbae743b43720d5c875a96d734,com.docker.compose.oneoff=False,com.docker.compose.project=infrastructure,com.docker.compose.project.config_files=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure\\docker-compose.yml,com.docker.compose.replace=grpc-postgres-1,com.docker.compose.service=grpc-postgres",
+        "LocalVolumes": "0",
+        "Mounts": "",
+        "Name": "infrastructure-grpc-postgres-1",
+        "Names": "infrastructure-grpc-postgres-1",
+        "Networks": "infrastructure_bench",
+        "Ports": "0.0.0.0:50051->50051/tcp, [::]:50051->50051/tcp, 0.0.0.0:50061->50061/tcp, [::]:50061->50061/tcp",
+        "Project": "infrastructure",
+        "Publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 50051,
+            "PublishedPort": 50051,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 50051,
+            "PublishedPort": 50051,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 50061,
+            "PublishedPort": 50061,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 50061,
+            "PublishedPort": 50061,
+            "Protocol": "tcp"
+          }
+        ],
+        "RunningFor": "9 hours ago",
+        "Service": "grpc-postgres",
+        "Size": "0B",
+        "State": "running",
+        "Status": "Up About a minute"
+      },
+      {
+        "Command": "\"python redis_servic\u00e2\u20ac\u00a6\"",
+        "CreatedAt": "2026-07-17 12:00:37 +0530 IST",
+        "ExitCode": 0,
+        "Health": "",
+        "ID": "ba1ae305ff82",
+        "Image": "infrastructure-grpc-redis",
+        "Labels": "com.docker.compose.config-hash=347649ad0eb0aa52352a01d2a76fd7d7c47fa4f5b4f46c8b3406ba1914d52784,com.docker.compose.oneoff=False,com.docker.compose.project=infrastructure,com.docker.compose.replace=grpc-redis-1,com.docker.compose.version=5.1.3,desktop.docker.io/ports/50053/tcp=:50053,com.docker.compose.container-number=1,com.docker.compose.depends_on=redis:service_healthy:false,com.docker.compose.image=sha256:1c125983ef20547669a420c7435ef1dac8bb61c2fcfb6a431fedcbb2f86a0100,com.docker.compose.project.config_files=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure\\docker-compose.yml,com.docker.compose.project.working_dir=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure,com.docker.compose.service=grpc-redis,desktop.docker.io/ports.scheme=v2,desktop.docker.io/ports/50063/tcp=:50063",
+        "LocalVolumes": "0",
+        "Mounts": "",
+        "Name": "infrastructure-grpc-redis-1",
+        "Names": "infrastructure-grpc-redis-1",
+        "Networks": "infrastructure_bench",
+        "Ports": "0.0.0.0:50053->50053/tcp, [::]:50053->50053/tcp, 0.0.0.0:50063->50063/tcp, [::]:50063->50063/tcp",
+        "Project": "infrastructure",
+        "Publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 50053,
+            "PublishedPort": 50053,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 50053,
+            "PublishedPort": 50053,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 50063,
+            "PublishedPort": 50063,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 50063,
+            "PublishedPort": 50063,
+            "Protocol": "tcp"
+          }
+        ],
+        "RunningFor": "9 hours ago",
+        "Service": "grpc-redis",
+        "Size": "0B",
+        "State": "running",
+        "Status": "Up About a minute"
+      },
+      {
+        "Command": "\"docker-entrypoint.s\u00e2\u20ac\u00a6\"",
+        "CreatedAt": "2026-07-12 13:01:59 +0530 IST",
+        "ExitCode": 0,
+        "Health": "healthy",
+        "ID": "26bccd9fdf24",
+        "Image": "mongo:7",
+        "Labels": "com.docker.compose.project.working_dir=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure,desktop.docker.io/ports.scheme=v2,com.docker.compose.depends_on=,com.docker.compose.project=infrastructure,com.docker.compose.project.config_files=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure\\docker-compose.yml,com.docker.compose.service=mongo,com.docker.compose.version=5.1.3,org.opencontainers.image.version=22.04,com.docker.compose.config-hash=1813bd8af6a595dcb4a585761f891278fa8de70cbf5793b6871477ddf60b7b12,com.docker.compose.container-number=1,com.docker.compose.image=sha256:faa77adca8915c6672577288a0a20db7d666de0c872cb2465daea6fd0082e274,com.docker.compose.oneoff=False",
+        "LocalVolumes": "2",
+        "Mounts": "fcd8b2f50b2cae\u00e2\u20ac\u00a6,infrastructure\u00e2\u20ac\u00a6",
+        "Name": "infrastructure-mongo-1",
+        "Names": "infrastructure-mongo-1",
+        "Networks": "infrastructure_bench",
+        "Ports": "27017/tcp",
+        "Project": "infrastructure",
+        "Publishers": [
+          {
+            "URL": "",
+            "TargetPort": 27017,
+            "PublishedPort": 0,
+            "Protocol": "tcp"
+          }
+        ],
+        "RunningFor": "5 days ago",
+        "Service": "mongo",
+        "Size": "0B",
+        "State": "running",
+        "Status": "Up About a minute (healthy)"
+      },
+      {
+        "Command": "\"docker-entrypoint.s\u00e2\u20ac\u00a6\"",
+        "CreatedAt": "2026-07-12 13:01:59 +0530 IST",
+        "ExitCode": 0,
+        "Health": "healthy",
+        "ID": "62be21847ffb",
+        "Image": "postgres:16-alpine",
+        "Labels": "com.docker.compose.depends_on=,com.docker.compose.image=sha256:de3a4eab8fdfa507ea92aac488b916b08089e515db49b055fe71dfa271ba3a28,com.docker.compose.oneoff=False,com.docker.compose.service=postgres,com.docker.compose.version=5.1.3,desktop.docker.io/ports.scheme=v2,com.docker.compose.config-hash=29566d9f035522bb68b8eea3a0581594d913c01a177142d9955370c9d312c3b5,com.docker.compose.project=infrastructure,com.docker.compose.project.config_files=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure\\docker-compose.yml,com.docker.compose.project.working_dir=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure,com.docker.compose.container-number=1",
+        "LocalVolumes": "1",
+        "Mounts": "infrastructure\u00e2\u20ac\u00a6",
+        "Name": "infrastructure-postgres-1",
+        "Names": "infrastructure-postgres-1",
+        "Networks": "infrastructure_bench",
+        "Ports": "5432/tcp",
+        "Project": "infrastructure",
+        "Publishers": [
+          {
+            "URL": "",
+            "TargetPort": 5432,
+            "PublishedPort": 0,
+            "Protocol": "tcp"
+          }
+        ],
+        "RunningFor": "5 days ago",
+        "Service": "postgres",
+        "Size": "0B",
+        "State": "running",
+        "Status": "Up About a minute (healthy)"
+      },
+      {
+        "Command": "\"/bin/prometheus --c\u00e2\u20ac\u00a6\"",
+        "CreatedAt": "2026-07-12 13:01:59 +0530 IST",
+        "ExitCode": 0,
+        "Health": "",
+        "ID": "4c2a8bf56a7c",
+        "Image": "prom/prometheus:v2.51.2",
+        "Labels": "desktop.docker.io/binds/0/Source=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\monitoring\\prometheus\\prometheus.yml,desktop.docker.io/ports/9090/tcp=:9090,com.docker.compose.container-number=1,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure\\docker-compose.yml,com.docker.compose.version=5.1.3,desktop.docker.io/ports.scheme=v2,maintainer=The Prometheus Authors <prometheus-developers@googlegroups.com>,com.docker.compose.image=sha256:051cb67876a609e838c4be62bf88348ba896b8411d17b3221743a1d31466a114,desktop.docker.io/binds/0/SourceKind=hostFile,desktop.docker.io/binds/0/Target=/etc/prometheus/prometheus.yml,com.docker.compose.project=infrastructure,com.docker.compose.project.working_dir=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure,com.docker.compose.service=prometheus,com.docker.compose.config-hash=18473d678ae5cf4089619d423c8728f839d4c62677a2649baaf59035da13ed9a,com.docker.compose.depends_on=",
+        "LocalVolumes": "1",
+        "Mounts": "/run/desktop/m\u00e2\u20ac\u00a6,8576d324444508\u00e2\u20ac\u00a6",
+        "Name": "infrastructure-prometheus-1",
+        "Names": "infrastructure-prometheus-1",
+        "Networks": "infrastructure_bench",
+        "Ports": "0.0.0.0:9090->9090/tcp, [::]:9090->9090/tcp",
+        "Project": "infrastructure",
+        "Publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 9090,
+            "PublishedPort": 9090,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 9090,
+            "PublishedPort": 9090,
+            "Protocol": "tcp"
+          }
+        ],
+        "RunningFor": "5 days ago",
+        "Service": "prometheus",
+        "Size": "0B",
+        "State": "running",
+        "Status": "Up About a minute"
+      },
+      {
+        "Command": "\"docker-entrypoint.s\u00e2\u20ac\u00a6\"",
+        "CreatedAt": "2026-07-12 13:01:59 +0530 IST",
+        "ExitCode": 0,
+        "Health": "healthy",
+        "ID": "b76e30658259",
+        "Image": "redis:7-alpine",
+        "Labels": "com.docker.compose.oneoff=False,com.docker.compose.project.config_files=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure\\docker-compose.yml,com.docker.compose.project.working_dir=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure,com.docker.compose.config-hash=253e9f994fd206734ca10ae16df6001f6d1a61576a9696be73b056e2fff0fc40,com.docker.compose.depends_on=,com.docker.compose.project=infrastructure,com.docker.compose.service=redis,com.docker.compose.version=5.1.3,desktop.docker.io/ports.scheme=v2,com.docker.compose.container-number=1,com.docker.compose.image=sha256:487efc0616382465781b8fdc3d6d1db449e6fd80ae23bf48432a2da6b6929908",
+        "LocalVolumes": "1",
+        "Mounts": "a318da6cc2a3b3\u00e2\u20ac\u00a6",
+        "Name": "infrastructure-redis-1",
+        "Names": "infrastructure-redis-1",
+        "Networks": "infrastructure_bench",
+        "Ports": "6379/tcp",
+        "Project": "infrastructure",
+        "Publishers": [
+          {
+            "URL": "",
+            "TargetPort": 6379,
+            "PublishedPort": 0,
+            "Protocol": "tcp"
+          }
+        ],
+        "RunningFor": "5 days ago",
+        "Service": "redis",
+        "Size": "0B",
+        "State": "running",
+        "Status": "Up About a minute (healthy)"
+      },
+      {
+        "Command": "\"uvicorn mongo_servi\u00e2\u20ac\u00a6\"",
+        "CreatedAt": "2026-07-17 12:00:37 +0530 IST",
+        "ExitCode": 0,
+        "Health": "",
+        "ID": "3fb2caf7689b",
+        "Image": "infrastructure-rest-mongo",
+        "Labels": "com.docker.compose.project=infrastructure,com.docker.compose.project.working_dir=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure,com.docker.compose.replace=rest-mongo-1,com.docker.compose.service=rest-mongo,com.docker.compose.version=5.1.3,desktop.docker.io/ports.scheme=v2,com.docker.compose.config-hash=f7bc717f0a2dca5dacd7ff63a4cf61356015d3766c5258e36a426846e06d7c0f,com.docker.compose.image=sha256:5d1cb411640933bd85a7987a0dc9e5cd81516505801521e264156e29c25f8dc3,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure\\docker-compose.yml,desktop.docker.io/ports/8002/tcp=:8002,com.docker.compose.container-number=1,com.docker.compose.depends_on=mongo:service_healthy:false",
+        "LocalVolumes": "0",
+        "Mounts": "",
+        "Name": "infrastructure-rest-mongo-1",
+        "Names": "infrastructure-rest-mongo-1",
+        "Networks": "infrastructure_bench",
+        "Ports": "0.0.0.0:8002->8002/tcp, [::]:8002->8002/tcp",
+        "Project": "infrastructure",
+        "Publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 8002,
+            "PublishedPort": 8002,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 8002,
+            "PublishedPort": 8002,
+            "Protocol": "tcp"
+          }
+        ],
+        "RunningFor": "9 hours ago",
+        "Service": "rest-mongo",
+        "Size": "0B",
+        "State": "running",
+        "Status": "Up About a minute"
+      },
+      {
+        "Command": "\"uvicorn postgres_se\u00e2\u20ac\u00a6\"",
+        "CreatedAt": "2026-07-17 12:00:37 +0530 IST",
+        "ExitCode": 0,
+        "Health": "",
+        "ID": "b2c3734f7bc5",
+        "Image": "infrastructure-rest-postgres",
+        "Labels": "com.docker.compose.project.config_files=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure\\docker-compose.yml,com.docker.compose.project.working_dir=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure,com.docker.compose.replace=rest-postgres-1,com.docker.compose.version=5.1.3,com.docker.compose.depends_on=postgres:service_healthy:false,com.docker.compose.image=sha256:80ab7e3f09dd84849380f28a47e26e702bf146dc147d24972ff1586fbfbefb1c,com.docker.compose.oneoff=False,com.docker.compose.service=rest-postgres,desktop.docker.io/ports.scheme=v2,desktop.docker.io/ports/8001/tcp=:8001,com.docker.compose.config-hash=9e087d3264a46fed99ce3e4923bfa09a4857b5185713e5fa85f7fdfb1425076c,com.docker.compose.container-number=1,com.docker.compose.project=infrastructure",
+        "LocalVolumes": "0",
+        "Mounts": "",
+        "Name": "infrastructure-rest-postgres-1",
+        "Names": "infrastructure-rest-postgres-1",
+        "Networks": "infrastructure_bench",
+        "Ports": "0.0.0.0:8001->8001/tcp, [::]:8001->8001/tcp",
+        "Project": "infrastructure",
+        "Publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 8001,
+            "PublishedPort": 8001,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 8001,
+            "PublishedPort": 8001,
+            "Protocol": "tcp"
+          }
+        ],
+        "RunningFor": "9 hours ago",
+        "Service": "rest-postgres",
+        "Size": "0B",
+        "State": "running",
+        "Status": "Up About a minute"
+      },
+      {
+        "Command": "\"uvicorn redis_servi\u00e2\u20ac\u00a6\"",
+        "CreatedAt": "2026-07-17 12:00:37 +0530 IST",
+        "ExitCode": 0,
+        "Health": "",
+        "ID": "5e3d386321d6",
+        "Image": "infrastructure-rest-redis",
+        "Labels": "desktop.docker.io/ports/8003/tcp=:8003,com.docker.compose.config-hash=4d1038a4221683eed138ec4aeff5526aec5dd5214bffb1019491d86454f604d6,com.docker.compose.container-number=1,com.docker.compose.depends_on=redis:service_healthy:false,com.docker.compose.project=infrastructure,com.docker.compose.service=rest-redis,desktop.docker.io/ports.scheme=v2,com.docker.compose.image=sha256:e0e455c30713b97755f3b0c209df1f01d9417344e00866a0417d88301db0f5a6,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure\\docker-compose.yml,com.docker.compose.project.working_dir=D:\\AllProjectsSem6\\DC\\ProtocolShift_DistributedComputing\\local\\infrastructure,com.docker.compose.replace=rest-redis-1,com.docker.compose.version=5.1.3",
+        "LocalVolumes": "0",
+        "Mounts": "",
+        "Name": "infrastructure-rest-redis-1",
+        "Names": "infrastructure-rest-redis-1",
+        "Networks": "infrastructure_bench",
+        "Ports": "0.0.0.0:8003->8003/tcp, [::]:8003->8003/tcp",
+        "Project": "infrastructure",
+        "Publishers": [
+          {
+            "URL": "0.0.0.0",
+            "TargetPort": 8003,
+            "PublishedPort": 8003,
+            "Protocol": "tcp"
+          },
+          {
+            "URL": "::",
+            "TargetPort": 8003,
+            "PublishedPort": 8003,
+            "Protocol": "tcp"
+          }
+        ],
+        "RunningFor": "9 hours ago",
+        "Service": "rest-redis",
+        "Size": "0B",
+        "State": "running",
+        "Status": "Up About a minute"
+      }
+    ]
+  },
+  "packages": {
+    "httpx": "0.27.0",
+    "grpcio": "1.63.0",
+    "grpcio-tools": "1.63.0",
+    "protobuf": "5.29.6",
+    "numpy": "2.5.1",
+    "scipy": "1.18.0",
+    "matplotlib": "3.11.0"
+  }
+}
