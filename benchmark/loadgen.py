@@ -196,7 +196,19 @@ async def run_load(cfg: RunConfig) -> RunResult:
         seeded_ids = []
         if cfg.op in ("read", "mixed"):
             seed_tasks = [client.create(payload) for _ in range(cfg.seed_records)]
-            seeded_ids = list(await asyncio.gather(*seed_tasks))
+            seeded_ids = [
+                rid for rid in await asyncio.gather(*seed_tasks, return_exceptions=True)
+                if not isinstance(rid, BaseException)
+            ]
+            if not seeded_ids:
+                # All seeds failed — fall back to create-only to avoid IndexError
+                import warnings
+                warnings.warn(
+                    f"All {cfg.seed_records} seed records failed; "
+                    f"falling back to create-only workload",
+                    RuntimeWarning,
+                    stacklevel=1,
+                )
 
         t_start = time.perf_counter()
         t_measure = t_start + cfg.warmup
@@ -209,7 +221,7 @@ async def run_load(cfg: RunConfig) -> RunResult:
                 t0 = time.perf_counter()
                 if t0 >= t_end:
                     return
-                do_create = cfg.op == "create" or (cfg.op == "mixed" and i % 2 == 0)
+                do_create = cfg.op == "create" or (cfg.op == "mixed" and i % 2 == 0) or not seeded_ids
                 i += 1
                 try:
                     if do_create:

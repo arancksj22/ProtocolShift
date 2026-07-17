@@ -28,6 +28,7 @@ The stack is left running afterwards so you can explore Grafana at
 http://localhost:3000 (admin / protocolshift).
 """
 
+from typing import NoReturn
 import argparse
 import os
 import platform
@@ -139,7 +140,7 @@ def ensure_venv() -> None:
         run([sys.executable, "-m", "venv", str(VENV_DIR)])
     print("Installing/validating benchmark dependencies ...")
     run(
-        [str(VENV_PY), "-m", "pip", "install", "--quiet",
+        [str(VENV_PY), "-m", "pip", "install", "--default-timeout=100", "--quiet",
          "-r", str(BENCH_DIR / "requirements.txt")],
     )
     print("Environment ready.")

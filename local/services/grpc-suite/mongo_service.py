@@ -93,7 +93,7 @@ class BenchmarkServicer(benchmark_pb2_grpc.BenchmarkServiceServicer):
             {"_id": "benchmark_records"},
             {"$inc": {"seq": 1}},
             upsert=True,
-            return_document=True,
+            return_document=ReturnDocument.AFTER,
         )
         return result["seq"]
 

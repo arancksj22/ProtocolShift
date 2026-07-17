@@ -552,11 +552,12 @@ def main() -> int:
 
     payloads = sorted({k[3] for k in cells})
     concs = sorted({k[2] for k in cells})
-    max_conc = concs[-1]
-    for payload in payloads:
-        plot_p99_vs_concurrency(cells, payload, plots_dir / f"p99_vs_concurrency_p{payload}.png")
-        plot_cdf(cells, max_conc, payload, plots_dir / f"cdf_c{max_conc}_p{payload}.png")
-        plot_p99_bars(cells, max_conc, payload, plots_dir / f"p99_bars_c{max_conc}_p{payload}.png")
+    if concs and payloads:
+        max_conc = concs[-1]
+        for payload in payloads:
+            plot_p99_vs_concurrency(cells, payload, plots_dir / f"p99_vs_concurrency_p{payload}.png")
+            plot_cdf(cells, max_conc, payload, plots_dir / f"cdf_c{max_conc}_p{payload}.png")
+            plot_p99_bars(cells, max_conc, payload, plots_dir / f"p99_bars_c{max_conc}_p{payload}.png")
 
     print(f"Analysis written to {out_dir}")
     for f in sorted(out_dir.rglob("*")):

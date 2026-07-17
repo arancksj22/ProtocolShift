@@ -51,10 +51,10 @@ class DockerStatsSampler(threading.Thread):
         super().__init__(daemon=True)
         self.label = label
         self.rows: list = []
-        self._stop = threading.Event()
+        self._stop_event = threading.Event()
 
     def run(self) -> None:
-        while not self._stop.is_set():
+        while not self._stop_event.is_set():
             ts = time.strftime("%Y-%m-%dT%H:%M:%S")
             try:
                 out = subprocess.run(
@@ -87,7 +87,7 @@ class DockerStatsSampler(threading.Thread):
                 )
 
     def stop(self) -> None:
-        self._stop.set()
+        self._stop_event.set()
 
     def append_csv(self, path: Path) -> None:
         if not self.rows:
