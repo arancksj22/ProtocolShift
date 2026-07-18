@@ -1,0 +1,25 @@
+{
+  "captured_at": "2026-07-18T17:06:38",
+  "host": {
+    "platform": "Linux-6.17.0-1017-aws-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "processor": "x86_64",
+    "cpu_count_logical": 2,
+    "python": "3.12.3 (main, Jun 19 2026, 12:46:00) [GCC 13.3.0]"
+  },
+  "docker": {
+    "engine": "<unavailable: [Errno 2] No such file or directory: 'docker'>",
+    "compose_dir": "/home/ubuntu/ProtocolShift/local/infrastructure",
+    "images": "<unavailable: [Errno 2] No such file or directory: 'docker'>",
+    "containers": "<unavailable: [Errno 2] No such file or directory: 'docker'>"
+  },
+  "packages": {
+    "httpx": "0.27.0",
+    "grpcio": "1.63.0",
+    "grpcio-tools": "1.63.0",
+    "protobuf": "5.29.6",
+    "numpy": "2.5.1",
+    "scipy": "1.18.0",
+    "matplotlib": "3.11.1"
+  }
+}
