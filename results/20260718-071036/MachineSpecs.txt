@@ -1,0 +1,10 @@
+"The experimental testbed was deployed on Amazon Web Services (AWS) in the ap-south-1 (Mumbai) region. The infrastructure consists of two virtual machine nodes configured as follows:
+
+Compute Instance Type: Amazon EC2 t3.medium
+Processor: 2 vCPUs (Intel Xeon Platinum 8000 series / Skylake architecture)
+Memory: 4.0 GiB DDR4 RAM
+Storage: 20 GiB General Purpose SSD (gp3) boot volumes
+Operating System: Ubuntu Server 24.04 LTS (Linux kernel 6.8.0)
+Virtualization Layer: Docker Engine v26.1+ / Docker Compose v2.27+
+Programming Environment: Python 3.12.3*
+One node was dedicated to hosting the microservice stack and databases (PostgreSQL 16, MongoDB 7, and Redis 7), while the second node acted as the client load generator, communicating over the internal VPC subnet to eliminate external internet routing latency."

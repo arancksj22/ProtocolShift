@@ -7,3 +7,5 @@ benchmark/flame_*.svg
 __pycache__/
 *.pyc
 .venv/
+*.pem
+
