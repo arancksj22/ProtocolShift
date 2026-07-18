@@ -17,6 +17,11 @@ python run_all.py --full           # full 5-trial campaign with profiling
 python run_all.py --stack-only     # just bring the stack up
 python run_all.py --down           # tear the stack down
 
+# Redis-gap rerun helper (guide: HOW_TO_RUN_2.md; three modes, one per machine)
+python run_all_2.py server         # AWS stack node: OOM evidence + expose DB ports
+python run_all_2.py client --server-ip <ip>  # AWS loadgen node: rerun + auto-merge
+python run_all_2.py local-profile  # local machine: postgres --profile campaign
+
 # Local benchmark (databases run in Docker)
 cd local/infrastructure
 docker compose up --build          # start everything

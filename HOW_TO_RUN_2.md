@@ -14,6 +14,33 @@ works without accumulating data, and this can't happen again.
 
 ---
 
+## TL;DR — one command per machine
+
+Everything below is automated by `run_all_2.py`. If you just want it done:
+
+```bash
+# 1. On the SERVER node (the EC2 machine running Docker):
+python3 run_all_2.py server
+#    -> captures OOM evidence, restarts the stack with DB ports published,
+#       prints this node's IP and the security-group rule to add.
+#    Then do the ONE manual step it prints: allow TCP 6379 from the client's
+#    private IP in the server's security group (EC2 console).
+
+# 2. On the CLIENT node (the load-generator machine):
+python3 run_all_2.py client --server-ip <IP printed by step 1>
+#    -> installs deps, reruns the lost Redis cells (~10 min), analyzes,
+#       auto-merges with the original campaign (dropping the contaminated
+#       trial), and prints the exact git commands to push.
+
+# 3. On a LOCAL machine with Docker Desktop (Part D, postgres profiling):
+python run_all_2.py local-profile
+```
+
+The sections below explain the same steps manually — read them if a command
+fails or you want to know what's happening.
+
+---
+
 ## Part A — On the SERVER node (the EC2 machine running Docker)
 
 ### A1. Grab the crash evidence (2 minutes, do this FIRST)
