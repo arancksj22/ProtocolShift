@@ -183,15 +183,21 @@ cd cloud
 docker compose --env-file .env up --build
 ```
 
-Then run the campaign without local-DB flushing/profiling:
+Then run the campaign with direct-connection flushing (the harness connects
+straight to the managed databases between trials using the same env vars —
+copy `cloud/.env` to `benchmark/.env` or export the vars in your shell):
 
 ```powershell
 cd benchmark
-python run_trials.py --skip-flush --compose-dir ..\cloud
+python run_trials.py --flush-mode direct --compose-dir ..\cloud
 ```
 
-Note: without flushing, tables grow across trials; keep cloud campaigns short
-or clear the managed databases between runs from their consoles.
+`--flush-mode none` skips flushing entirely, but data then accumulates across
+trials (this is what caused the Redis OOM crash on the first AWS campaign —
+see HOW_TO_RUN_2.md). For two-node setups (app stack on one machine, load
+generator on another), see **HOW_TO_RUN_2.md** — it covers publishing the DB
+ports with `docker-compose.expose-dbs.yml` and running with
+`--host <SERVER_IP> --flush-mode direct`.
 
 ---
 

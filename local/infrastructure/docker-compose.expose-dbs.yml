@@ -1,0 +1,24 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Override: publish database ports on the host.
+#
+# ONLY needed for two-node benchmark setups where the load-generator machine
+# must flush the databases between trials (run_trials.py --flush-mode direct).
+#
+# Usage (on the server node, from this directory):
+#   docker compose -f docker-compose.yml -f docker-compose.expose-dbs.yml up -d --build
+#
+# SECURITY: never expose these ports to the public internet. On AWS, restrict
+# 5432/27017/6379 in the security group to the load-generator's private IP
+# (same VPC). The compose credentials are deliberately weak defaults.
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+  mongo:
+    ports:
+      - "27017:27017"
+  redis:
+    ports:
+      - "6379:6379"

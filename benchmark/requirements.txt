@@ -13,3 +13,12 @@ protobuf>=5.26.1,<6.0
 numpy>=1.26
 scipy>=1.11
 matplotlib>=3.8
+
+# Direct database flushing between trials (--flush-mode direct, for
+# two-node setups where docker compose exec is not available).
+# Versions match local/services/*/requirements.txt.
+redis[asyncio]==5.0.3
+asyncpg==0.29.0
+motor==3.4.0
+pymongo==4.8.0
+python-dotenv==1.0.1

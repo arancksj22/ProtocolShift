@@ -16,8 +16,16 @@ Typical usage (from benchmark/):
   python run_trials.py --profile                    # + docker stats & pg_stat_statements
   python run_trials.py --backends redis --trials 3  # narrower sweep
 
-Cloud mode (managed DBs — no local db containers to flush/profile):
-  python run_trials.py --skip-flush --compose-dir ../cloud
+Remote / two-node mode (databases not reachable via docker compose exec):
+  python run_trials.py --host <SERVER_IP> --flush-mode direct
+  # direct flushing connects straight to the databases using REDIS_URL /
+  # POSTGRES_DSN / MONGO_URI env vars (also read from a .env file).
+  # The server must publish the DB ports — see
+  # local/infrastructure/docker-compose.expose-dbs.yml
+
+Cloud mode (managed DBs):
+  python run_trials.py --flush-mode direct --compose-dir ../cloud
+  # or --flush-mode none to skip flushing entirely (data accumulates!)
 
 Output layout:
   results/<run_id>/
@@ -30,6 +38,7 @@ Output layout:
 import argparse
 import asyncio
 import json
+import os
 import subprocess
 import sys
 import time
@@ -39,6 +48,13 @@ from pathlib import Path
 import capture_env
 import profiling
 from loadgen import RunConfig, run_load
+
+try:  # pick up REDIS_URL / POSTGRES_DSN / MONGO_URI from a .env file if present
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
 
 BENCH_DIR = Path(__file__).resolve().parent
 DEFAULT_COMPOSE_DIR = BENCH_DIR.parent / "local" / "infrastructure"
@@ -76,6 +92,62 @@ def flush_backend(backend: str, compose_dir: str) -> bool:
     return True
 
 
+def flush_direct(backend: str, host: str) -> bool:
+    """Flush a backend by connecting to it directly (no docker compose exec).
+
+    Connection strings come from env vars / .env: REDIS_URL, POSTGRES_DSN,
+    MONGO_URI (+MONGO_DB). If unset, sensible defaults pointing at --host
+    are used, matching the compose stack's credentials.
+    """
+
+    async def _flush_redis() -> None:
+        import redis.asyncio as aioredis
+
+        url = os.getenv("REDIS_URL", f"redis://{host}:6379/0")
+        r = aioredis.from_url(url)
+        try:
+            await r.flushdb()
+        finally:
+            await r.aclose()
+
+    async def _flush_postgres() -> None:
+        import asyncpg
+
+        dsn = os.getenv(
+            "POSTGRES_DSN", f"postgresql://postgres:postgres@{host}:5432/benchmarkdb"
+        )
+        conn = await asyncpg.connect(dsn=dsn, timeout=20)
+        try:
+            await conn.execute(
+                "TRUNCATE benchmark_records RESTART IDENTITY;"
+            )
+        finally:
+            await conn.close()
+
+    async def _flush_mongo() -> None:
+        from motor.motor_asyncio import AsyncIOMotorClient
+
+        uri = os.getenv("MONGO_URI", f"mongodb://{host}:27017")
+        db = os.getenv("MONGO_DB", "benchmarkdb")
+        client = AsyncIOMotorClient(uri, serverSelectionTimeoutMS=20000)
+        try:
+            await client[db].benchmark_records.delete_many({})
+            await client[db].benchmark_counters.delete_many({})
+        finally:
+            client.close()
+
+    flushers = {"redis": _flush_redis, "postgres": _flush_postgres, "mongo": _flush_mongo}
+    try:
+        asyncio.run(flushers[backend]())
+        return True
+    except Exception as exc:
+        print(f"  [warn] direct flush {backend} failed: {type(exc).__name__}: "
+              f"{str(exc)[:200]}")
+        print("         Are the DB ports published on the server? "
+              "(docker-compose.expose-dbs.yml) Is the env var / --host correct?")
+        return False
+
+
 # ──────────────────────────────────────────────
 # Campaign
 # ──────────────────────────────────────────────
@@ -92,8 +164,15 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--host", default="localhost")
     p.add_argument("--results-dir", default=str(BENCH_DIR.parent / "results"))
     p.add_argument("--compose-dir", default=str(DEFAULT_COMPOSE_DIR))
+    p.add_argument("--flush-mode", choices=["docker", "direct", "none"], default="docker",
+                   help="How to flush databases between trials: 'docker' via "
+                        "docker compose exec (default, needs the stack on this "
+                        "machine), 'direct' by connecting to the DBs over the "
+                        "network (REDIS_URL/POSTGRES_DSN/MONGO_URI env vars or "
+                        "--host defaults), 'none' to skip flushing (data "
+                        "accumulates across trials!)")
     p.add_argument("--skip-flush", action="store_true",
-                   help="Do not flush databases between trials (use for cloud backends)")
+                   help="Deprecated alias for --flush-mode none")
     p.add_argument("--profile", action="store_true",
                    help="Capture docker stats + pg_stat_statements per trial")
     p.add_argument("--quick", action="store_true",
@@ -107,6 +186,8 @@ def cell_name(suite: str, backend: str, conc: int, payload: int) -> str:
 
 def main() -> int:
     args = parse_args()
+    if args.skip_flush:
+        args.flush_mode = "none"
     if args.quick:
         args.trials = 1
         args.duration = 5.0
@@ -136,7 +217,7 @@ def main() -> int:
         "warmup_s": args.warmup,
         "op": args.op,
         "host": args.host,
-        "flush_between_trials": not args.skip_flush,
+        "flush_mode": args.flush_mode,
         "profiling": args.profile,
     }
     with open(out_dir / "config.json", "w") as f:
@@ -174,8 +255,10 @@ def main() -> int:
                             name = cell_name(suite, backend, conc, payload)
                             tag = f"[{done}/{total_runs}] {name} trial {trial}"
 
-                            if not args.skip_flush:
+                            if args.flush_mode == "docker":
                                 flush_backend(backend, args.compose_dir)
+                            elif args.flush_mode == "direct":
+                                flush_direct(backend, args.host)
                             if pg_profiling and backend == "postgres":
                                 profiling.pg_stat_reset(args.compose_dir)
 

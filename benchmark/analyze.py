@@ -191,11 +191,17 @@ def compare_cells(cells: dict) -> list:
             ci_verdict = "rest faster (CIs disjoint)"
         else:
             ci_verdict = "CIs overlap"
+        # A side with <2 trials cannot be compared robustly — and a lone
+        # surviving trial usually means the system was failing (e.g. a dying
+        # database), so its latencies measure the failure, not the protocol.
+        insufficient = rest["trials"] < 2 or grpc["trials"] < 2
         comparisons.append(
             {
                 "backend": backend,
                 "concurrency": conc,
                 "payload_bytes": payload,
+                "rest_trials": rest["trials"],
+                "grpc_trials": grpc["trials"],
                 "rest_p99_ms": rest_p99["mean"],
                 "rest_p99_ci95": rest_p99["ci95"],
                 "grpc_p99_ms": grpc_p99["mean"],
@@ -203,6 +209,7 @@ def compare_cells(cells: dict) -> list:
                 "grpc_improvement_pct": improvement_pct,
                 "mannwhitney_p": float(p_value),
                 "ci_verdict": ci_verdict,
+                "insufficient_trials": insufficient,
             }
         )
     return comparisons
@@ -273,12 +280,13 @@ def write_summary_md(cells: dict, comparisons: list, campaign: dict, path: Path)
         "",
         "## Per-cell latency",
         "",
-        "| Suite | Backend | Conc. | Payload | Req/s | p50 | p95 | p99 | p99 CoV |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| Suite | Backend | Conc. | Payload | Trials | Req/s | p50 | p95 | p99 | p99 CoV |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for (suite, backend, conc, payload), c in sorted(cells.items()):
         lines.append(
             f"| {suite} | {backend} | {conc} | {payload}B "
+            f"| {c['trials']} "
             f"| {fmt(c['rps'][0], 0)} "
             f"| {fmt(c['p50']['mean'])} ± {fmt(c['p50']['ci95'])} "
             f"| {fmt(c['p95']['mean'])} ± {fmt(c['p95']['ci95'])} "
@@ -295,7 +303,16 @@ def write_summary_md(cells: dict, comparisons: list, campaign: dict, path: Path)
         "| Backend | Conc. | Payload | REST p99 | gRPC p99 | gRPC improv. | MWU p-value | Trial-CI verdict |",
         "|---|---|---|---|---|---|---|---|",
     ]
+    excluded = []
     for r in comparisons:
+        if r["insufficient_trials"]:
+            lines.append(
+                f"| {r['backend']} | {r['concurrency']} | {r['payload_bytes']}B "
+                f"| — | — | — | — | **EXCLUDED** (rest n={r['rest_trials']}, "
+                f"grpc n={r['grpc_trials']} trials) |"
+            )
+            excluded.append(r)
+            continue
         p = r["mannwhitney_p"]
         p_str = "<0.001" if p < 0.001 else f"{p:.3f}"
         lines.append(
@@ -304,6 +321,15 @@ def write_summary_md(cells: dict, comparisons: list, campaign: dict, path: Path)
             f"| {fmt(r['grpc_p99_ms'])} ± {fmt(r['grpc_p99_ci95'])} "
             f"| {fmt(r['grpc_improvement_pct'], 1)}% | {p_str} | {r['ci_verdict']} |"
         )
+    if excluded:
+        lines += [
+            "",
+            "**Excluded scenarios**: a side with <2 completed trials cannot be "
+            "compared — a lone surviving trial typically measures a failing "
+            "system (e.g. a database dying mid-run), not protocol performance. "
+            "Report these cells as availability failures and re-run them for "
+            "latency numbers.",
+        ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -338,6 +364,12 @@ def write_migration_decision(
         "|---|---|---|---|---|---|---|",
     ]
     for r in comparisons:
+        if r["insufficient_trials"]:
+            lines.append(
+                f"| {r['backend']} | {r['concurrency']} | {r['payload_bytes']}B "
+                f"| — | — | — | EXCLUDED (insufficient trials) |"
+            )
+            continue
         g1 = r["grpc_improvement_pct"] >= min_improvement
         g2 = r["ci_verdict"] == "grpc faster (CIs disjoint)" and r["mannwhitney_p"] < 0.01
         share = None
@@ -550,14 +582,22 @@ def main() -> int:
         out_dir / "migration_decision.md",
     )
 
-    payloads = sorted({k[3] for k in cells})
-    concs = sorted({k[2] for k in cells})
+    # Plots only show robust cells: a single-trial cell usually captured a
+    # failing system and would distort every axis it appears on.
+    plot_cells = {k: v for k, v in cells.items() if v["trials"] >= 2}
+    dropped = len(cells) - len(plot_cells)
+    if dropped:
+        print(f"[note] {dropped} cell(s) with <2 trials excluded from plots "
+              "(still listed in summary tables, marked EXCLUDED in comparisons).")
+
+    payloads = sorted({k[3] for k in plot_cells})
+    concs = sorted({k[2] for k in plot_cells})
     if concs and payloads:
         max_conc = concs[-1]
         for payload in payloads:
-            plot_p99_vs_concurrency(cells, payload, plots_dir / f"p99_vs_concurrency_p{payload}.png")
-            plot_cdf(cells, max_conc, payload, plots_dir / f"cdf_c{max_conc}_p{payload}.png")
-            plot_p99_bars(cells, max_conc, payload, plots_dir / f"p99_bars_c{max_conc}_p{payload}.png")
+            plot_p99_vs_concurrency(plot_cells, payload, plots_dir / f"p99_vs_concurrency_p{payload}.png")
+            plot_cdf(plot_cells, max_conc, payload, plots_dir / f"cdf_c{max_conc}_p{payload}.png")
+            plot_p99_bars(plot_cells, max_conc, payload, plots_dir / f"p99_bars_c{max_conc}_p{payload}.png")
 
     print(f"Analysis written to {out_dir}")
     for f in sorted(out_dir.rglob("*")):
