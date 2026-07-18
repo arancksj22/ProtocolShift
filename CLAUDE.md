@@ -21,6 +21,7 @@ python run_all.py --down           # tear the stack down
 python run_all_2.py server         # AWS stack node: OOM evidence + expose DB ports
 python run_all_2.py client --server-ip <ip>  # AWS loadgen node: rerun + auto-merge
 python run_all_2.py local-profile  # local machine: postgres --profile campaign
+python run_all_3.py                # client node: merge original campaign + redis rerun -> results/aws-merged/
 
 # Local benchmark (databases run in Docker)
 cd local/infrastructure
