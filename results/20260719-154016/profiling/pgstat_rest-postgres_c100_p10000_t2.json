@@ -1,0 +1,44 @@
+[
+  {
+    "query": "INSERT INTO benchmark_records (payload) VALUES ($1) RETURNING *",
+    "calls": 1721,
+    "total_exec_ms": 393.367,
+    "mean_exec_ms": 0.2286,
+    "rows": 1721
+  },
+  {
+    "query": "SELECT * FROM benchmark_records WHERE id = $1",
+    "calls": 1466,
+    "total_exec_ms": 307.012,
+    "mean_exec_ms": 0.2094,
+    "rows": 1466
+  },
+  {
+    "query": "SELECT pg_advisory_unlock_all()",
+    "calls": 3187,
+    "total_exec_ms": 19.385,
+    "mean_exec_ms": 0.0061,
+    "rows": 3187
+  },
+  {
+    "query": "RESET ALL",
+    "calls": 3187,
+    "total_exec_ms": 15.547,
+    "mean_exec_ms": 0.0049,
+    "rows": 0
+  },
+  {
+    "query": "CLOSE ALL",
+    "calls": 3187,
+    "total_exec_ms": 2.808,
+    "mean_exec_ms": 0.0009,
+    "rows": 0
+  },
+  {
+    "query": "UNLISTEN *",
+    "calls": 3187,
+    "total_exec_ms": 1.758,
+    "mean_exec_ms": 0.0006,
+    "rows": 0
+  }
+]

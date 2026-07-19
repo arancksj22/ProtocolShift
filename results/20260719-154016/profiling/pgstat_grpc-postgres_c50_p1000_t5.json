@@ -1,0 +1,58 @@
+[
+  {
+    "query": "INSERT INTO benchmark_records (payload) VALUES ($1) RETURNING *",
+    "calls": 7954,
+    "total_exec_ms": 584.296,
+    "mean_exec_ms": 0.0735,
+    "rows": 7954
+  },
+  {
+    "query": "SELECT * FROM benchmark_records WHERE id = $1",
+    "calls": 7729,
+    "total_exec_ms": 566.22,
+    "mean_exec_ms": 0.0733,
+    "rows": 7729
+  },
+  {
+    "query": "SELECT pg_advisory_unlock_all()",
+    "calls": 15684,
+    "total_exec_ms": 141.863,
+    "mean_exec_ms": 0.009,
+    "rows": 15684
+  },
+  {
+    "query": "RESET ALL",
+    "calls": 15684,
+    "total_exec_ms": 126.056,
+    "mean_exec_ms": 0.008,
+    "rows": 0
+  },
+  {
+    "query": "CLOSE ALL",
+    "calls": 15684,
+    "total_exec_ms": 20.196,
+    "mean_exec_ms": 0.0013,
+    "rows": 0
+  },
+  {
+    "query": "UNLISTEN *",
+    "calls": 15684,
+    "total_exec_ms": 10.742,
+    "mean_exec_ms": 0.0007,
+    "rows": 0
+  },
+  {
+    "query": "SELECT COUNT(*) FROM benchmark_records",
+    "calls": 1,
+    "total_exec_ms": 0.019,
+    "mean_exec_ms": 0.019,
+    "rows": 1
+  },
+  {
+    "query": "SELECT * FROM benchmark_records ORDER BY id ASC LIMIT $1 OFFSET $2",
+    "calls": 1,
+    "total_exec_ms": 0.017,
+    "mean_exec_ms": 0.0174,
+    "rows": 0
+  }
+]

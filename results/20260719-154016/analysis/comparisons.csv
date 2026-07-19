@@ -1,0 +1,10 @@
+backend,concurrency,payload_bytes,rest_trials,grpc_trials,rest_p99_ms,rest_p99_ci95,grpc_p99_ms,grpc_p99_ci95,grpc_improvement_pct,mannwhitney_p,ci_verdict,insufficient_trials
+postgres,10,100,5,5,80.0282,35.0290,20.8661,15.0123,73.9266,0.0000,grpc faster (CIs disjoint),False
+postgres,10,1000,5,5,74.0392,12.6534,42.8555,20.9757,42.1178,0.0000,CIs overlap,False
+postgres,10,10000,5,5,89.2759,21.3129,54.6565,18.2534,38.7781,0.0000,CIs overlap,False
+postgres,50,100,5,5,1521.5128,202.6917,115.0657,118.1843,92.4374,0.0000,grpc faster (CIs disjoint),False
+postgres,50,1000,5,5,1551.3348,217.1641,160.3650,105.5681,89.6628,0.0000,grpc faster (CIs disjoint),False
+postgres,50,10000,5,5,1904.6417,870.5260,111.2704,33.2971,94.1579,0.0000,grpc faster (CIs disjoint),False
+postgres,100,100,5,5,3301.6304,523.6451,285.0789,126.9606,91.3655,0.0000,grpc faster (CIs disjoint),False
+postgres,100,1000,5,5,3613.9278,1584.1807,321.8346,275.9076,91.0946,0.0000,grpc faster (CIs disjoint),False
+postgres,100,10000,5,5,2777.4898,519.9221,225.8439,93.0846,91.8688,0.0000,grpc faster (CIs disjoint),False
