@@ -1,4 +1,4 @@
-# HOW TO RUN 2 — Fixing the Redis Gap (AWS rerun guide)
+/res# HOW TO RUN 2 — Fixing the Redis Gap (AWS rerun guide)
 
 This guide is for re-running **only the Redis 10KB cells** that were lost when
 Redis crashed (OOM) during the first AWS campaign, plus collecting the crash
