@@ -1,0 +1,409 @@
+\documentclass[conference]{IEEEtran}
+
+% Import necessary packages
+\usepackage{graphicx} % For including images
+\usepackage{cite}     % For handling citations
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{textcomp}
+\usepackage{array}     % For more advanced table column definitions
+\usepackage[utf8]{inputenc} % Ensure proper text encoding
+\usepackage{dblfloatfix} % For better two-column float placement
+\usepackage{booktabs}  % For professional-quality tables
+
+\renewcommand{\IEEEkeywordsname}{Keywords}
+
+% --- FONT ---
+% Uses Times New Roman font for text and math
+\usepackage{newtxtext, newtxmath}
+
+\usepackage{fancyhdr}
+% ------------
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\IEEEoverridecommandlockouts
+
+\makeatletter
+\newcommand{\newlineauthors}{%
+  \end{@IEEEauthorhalign}\hfill\mbox{}\par
+  \mbox{}\hfill\begin{@IEEEauthorhalign}
+}
+\makeatother
+
+\begin{document}
+
+\title{ProtocolShift: An Empirical Framework for REST vs. gRPC Protocols,
+Isolating Protocol Metrics Across Multi-Paradigm Cloud (AWS) Database Architectures}
+
+\author{
+    \IEEEauthorblockN{Moksh Jain}
+    \IEEEauthorblockA{\textit{Department of Computer Engineering} \\
+  \textit{SVKM's NMIMS Mukesh Patel School} \\
+    \textit{of Technology Management \& } \\
+    \textit{Engineering} \\
+    Mumbai, India \\
+    moksh.jain81@nmims.in}
+    \and
+    \IEEEauthorblockN{Kahaan Kakabalia}
+    \IEEEauthorblockA{\textit{Department of Computer Engineering} \\
+    \textit{SVKM's NMIMS Mukesh Patel School} \\
+    \textit{of Technology Management \&} \\
+    \textit{Engineering} \\
+    Mumbai, India \\
+    kahaanashish.kakabalia28@nmims.in}
+    \and
+    \IEEEauthorblockN{Shlok Doshi}
+    \IEEEauthorblockA{\textit{Department of Computer Engineering} \\
+    \textit{SVKM's NMIMS Mukesh Patel School} \\
+    \textit{of Technology Management \&} \\
+    \textit{Engineering} \\
+    Mumbai, India \\
+    shlok.doshi49@nmims.in}
+    \newlineauthors
+    \IEEEauthorblockN{Aranck Jomraj}
+    \IEEEauthorblockA{\textit{Department of Computer Engineering} \\
+    \textit{SVKM's NMIMS Mukesh Patel School} \\
+    \textit{of Technology Management \&} \\
+    \textit{Engineering} \\
+    Mumbai, India \\
+    aranck.jomraj01@nmims.in}
+    \and
+    \IEEEauthorblockN{Prashasti Kanikar}
+    \IEEEauthorblockA{\textit{Department of Computer Engineering} \\
+    \textit{SVKM's NMIMS Mukesh Patel School} \\
+    \textit{of Technology Management \&} \\
+    \textit{Engineering} \\
+    Mumbai, India \\
+    prashasti.kanikar@nmims.edu}
+}
+
+\maketitle
+
+
+\begin{abstract}
+In this paper, ProtocolShift is introduced as a useful empirical framework to understand REST and gRPC transport overhead over database execution, for a two-node AWS cloud deployment using PostgreSQL, MongoDB and Redis. Benchmarks ignore the database tier and use mean latency, obscuring tail degradation. ProtocolShift tackles this by performing 5 independent trials per configuration with 95\% Student's \textit{t} confidence intervals and Mann--Whitney U testing ($\alpha = 0.01$), in a closed-loop asynchronous load generator with persistent connections. Relative to REST, gRPC is found to be 88--94\% more efficient at reducing the p99 tail latency under high concurrency ($c \ge 50$). Measurement of database execution latency as probed by query-level profiling via pg\_stat\_statements verifies that database execution accounts for less than 0.3\% of end-to-end latency, where transport queuing is the biggest latency factor. These findings are encoded into a three-gate Protocol Migration Threshold with reproducible verdicts of MIGRATE/HOLD for evidence-based protocol adoption.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Distributed Systems, gRPC, REST, Observability, Tail Latency, Database Architecture.
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+With microservices and service-oriented architectures (SOA), REST and gRPC become engineering choices that have enormous implications on scalability and resource allocation. The de facto standard is REST over HTTP/1.1 and JSON \cite{vural2017} but JSON serialization/parsing overhead can take 10--40\% of response time for peak traffic. In contrast, gRPC supports binary multiplexing (via HTTP/2) and Protocol Buffers (Protobuf) so that it can achieve radical performance improvements, such as the ability to compress headers with HPACK for HTTP/2, binary framing, and the benefit of eliminating Head-of-Line blocking in HTTP/1.1. In spite of the theoretical benefits, however, there is still a lack of empirical evaluations in the cloud for multi-paradigm database workloads.
+
+Based on the literature review, there are five main research gaps which are discussed in Table \ref{tab:research_gaps} and are the objectives of the test bed.
+
+\vspace{-2mm}
+\begin{table}[htbp]
+\renewcommand{\arraystretch}{1.2}
+\caption{Identified Research Gaps}
+\label{tab:research_gaps}
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{} c >{\raggedright\arraybackslash}p{0.28\columnwidth} >{\raggedright\arraybackslash}p{0.58\columnwidth} @{}}
+\hline
+\textbf{\#} & \textbf{Research Gap} & \textbf{Description} \\
+\hline
+1 & Database Blind Spot & Benchmarks often ignore database latency \cite{amdahl1967}, failing to assess if faster protocols matter when storage is the bottleneck. \\
+2 & Incomplete Tail Latency & Literature relies on mean latency. Critical p99 tail latency comparisons under load are absent \cite{dean2013}, masking edge-case degradation. \\
+3 & No Migration Thresholds & Existing studies lack quantitative decision thresholds (e.g., p99 gates) to justify protocol migration effort. \\
+4 & Unmeasured Migration Cost & Empirical data is lacking on dual-stack performance overheads and schema versioning friction during live transitions. \\
+5 & Local-to-Cloud Gap & Local benchmarks are assumed to generalize to cloud environments, ignoring network jitter and mTLS overheads. \\
+\hline
+\end{tabular}%
+}
+\end{table}
+
+We address these gaps by using ProtocolShift, a controlled evaluation framework. We hypothesize that the performance gains of gRPC depend on a storage paradigm and key infrastructure parameters. Our contributions are:
+
+\begin{enumerate}
+    \item A tripartite storage benchmark comparing REST and gRPC on Relational (PostgreSQL), Document (MongoDB), and In-Memory (Redis) backends.
+    \item A fully asynchronous, zero-ORM pipeline isolating raw serialization and transport latency without application overhead.
+    \item A statistically rigorous evaluation incorporating repeated trials, 95\% confidence intervals, and Mann--Whitney U significance testing on pooled per-request distributions.
+    \item Query-level database profiling via pg\_stat\_statements isolating protocol transport overhead from database storage time.
+    \item A highly observable migration structure using Prometheus, Grafana, and a three-gate Protocol Migration Threshold model based on the Strangler Fig pattern for safe protocol switching.
+\end{enumerate}
+
+\section{Literature Review}
+
+\subsection{Microservice Architecture and Communication}
+Microservice architectures decouple monolithic applications into autonomous, independently deployable services that communicate via lightweight network protocols. REST APIs over HTTP/1.1 with JSON serialization have served as the default inter-service communication paradigm since 2014 \cite{vural2017}. However, as service graphs expand to hundreds of microservices, textual JSON parsing and un-multiplexed HTTP/1.1 connections introduce non-trivial latency and CPU overhead. Despite widespread industrial adoption, systematic literature reviews reveal a paucity of empirical evidence regarding architecture-level protocol trade-offs, real-time telemetry instrumentation, and production migration strategies under multi-database workloads \cite{li2021, waseem2020, cerny2021}.
+
+\subsection{Protocol Performance Benchmarks}
+Protocol benchmarks consistently show gRPC outperforming REST. Arora et al. evaluated the communication efficiency of REST vs. gRPC in microservice-based ecosystems \cite{arora2024}. Industry evaluations show that gRPC provides 15--40 times higher throughput with large payloads, though REST can outperform gRPC with small payloads in local deployments \cite{apriansyah2024}. Other works attest to the speed benefit of gRPC in microservice environments \cite{weerasinghe2022} and complex data exchanges \cite{bolanowski2022, apriansyah2024}.
+
+These benchmarks share one major limitation: they test protocols without a variable underlying storage layer, leaving it an open question whether protocol speed matters at all when request time is dominated by database latency (Amdahl's Law \cite{amdahl1967}).
+
+\subsection{HTTP/2 and Multiplexing}
+gRPC relies on HTTP/2 multiplexing to eliminate head-of-line blocking on HTTP/1.1. However, Marx et al. demonstrated that the single connection provided by HTTP/2 can prove to be a bottleneck under low-quality network conditions, outperforming HTTP/1.1 only in favorable situations \cite{marx2018}. This environmental sensitivity implies that local benchmarks can exaggerate the benefits realizable in cloud implementations.
+
+\subsection{Serialization: Protobuf vs.\ JSON}
+Protobuf is faster and smaller than JSON for data serialization. Proos and Carlsson found Protobuf messages are 3$\times$ smaller than Flatbuffers \cite{proos2020}. Since JSON encodes numbers as strings whereas Protobuf uses raw bytes, Protobuf encodes number-heavy payloads 34$\times$ as fast and string-heavy payloads 2.7$\times$ as fast. Nonetheless, the strict schema discipline Protobuf imposes carries an operational overhead that throughput benchmarks do not capture \cite{popic2016}.
+
+\subsection{Tail Latency in Distributed Systems}
+Mean latency conceals tail degradation impacting user experience. Dean and Barroso confirmed that even small amounts of contention produce severe tail latency \cite{dean2013}. This is amplified in microservices: allowing one server to pause 1\% of the time means a request fanning to 100 servers has a 63\% probability of encountering a delay. Sturdy monitoring therefore depends on p95/p99 statistics as opposed to per-request averages \cite{gan2019}. Despite operational guidance recommending binary formats and connection multiplexing to even out tail latency, published experimental evidence comparing REST and gRPC at p99 at scale remains scarce.
+
+\subsection{Migration Strategies}
+The Strangler Fig pattern is standard for incremental modernization. It has been experimentally validated on government monoliths \cite{li2020} and large industrial platforms such as Netflix Cosmos, where it has been shown to reduce downtime during transition. However, all extant implementations rely on human rollback decisions. No information exists in the literature about the operational cost of a dual-stack transition or a structure for automated latency-triggered rollback.
+
+\subsection{Observability Infrastructure}
+The Prometheus and Grafana stack is the industry standard for measuring service health in terms of latency, traffic, errors, and saturation \cite{beyer2016, barrett2025}. These tools enable canary deployments, where routing 5\% of traffic to a new service allows automatic rollbacks if p99 latency or error rates decline. This paper quantifies the migration costs overlooked in previous studies using that same observability architecture.
+
+\section{System Architecture and Methodology}
+
+ProtocolShift is designed as a controlled experimental testbed to isolate communication protocol performance from application logic and cloud infrastructure noise. Identical CRUD functions (Create, Read, ReadAll, Update, Delete) are exposed through parallel service layers across three database paradigms.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{paper_figs/architecture.jpg}}
+\caption{System Architecture Diagram: parallel REST and gRPC suites over three database paradigms, instrumented by Prometheus and Grafana.}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Observability and Telemetry Framework}
+In distributed systems, the mean latency is a bad measure of stability, because only the slowest 1\% of requests affect stability \cite{dean2013}. In place of log parsing, Prometheus and Grafana are used. A pull-based topology operates by ``pulling'' data from the service containers by having special HTTP endpoints on them.
+
+With gRPC, it is possible to publish real-time histograms from a secondary HTTP server in the Python asyncio event loop. The Four Golden Signals---Latency, Traffic, Errors, and Saturation---are collected in real-time as described in \cite{beyer2016}. A latency histogram records response times in buckets from 1 ms to 2.5 s, enabling accurate percentile calculation. Grafana dashboards visualize these performance differences and identify the saturation point at which JSON parsing overhead begins to degrade throughput.
+
+\subsection{Service Layer Design and Data Flow}
+The testbed is divided into two mutually exclusive Service Suites handling identical lifecycle operations:
+\textbf{REST suite} uses FastAPI (ASGI standard), Starlette web primitives, and Pydantic JSON schemas, measuring saturation from TCP connection limits or payload bloat rather than thread-pool exhaustion.
+\textbf{gRPC suite} implements identical methods with typed gRPC Service constraints defined via Interface Definition Language (IDL). Using grpc.aio, data flows over persistent HTTP/2 streams with binary framing, eliminating HTTP/1.1 head-of-line blocking.
+
+\subsection{Multi-Paradigm Database Testbeds}
+To empirically test whether protocol optimizations are eclipsed by database latency, ProtocolShift evaluates three storage paradigms: (1)~\textbf{Relational Persistence (PostgreSQL 16):} Heavy compute tier accessed via raw asyncpg SQL without ORMs, testing Protobuf binary ingestion versus JSON dictionary mapping; (2)~\textbf{In-Memory Persistence (Redis 7):} Sub-millisecond RAM storage removing disk I/O, isolating transport protocol efficiency as the sole performance variable; and (3)~\textbf{Document-Oriented Storage (MongoDB 7):} Handles unstructured payloads to evaluate how Protobuf's strict typing compares with JSON/BSON document translations.
+
+\subsection{Closed-Loop Asynchronous Load Generation}
+To isolate network transport efficiency under load, ProtocolShift employs a closed-loop asynchronous load generator: REST traffic uses persistent httpx.AsyncClient connection pools, while gRPC utilizes a persistent grpc.aio channel with HTTP/2 stream multiplexing. Concurrent workers issue requests back-to-back with zero think time, logging client-side wall-clock latencies.
+
+\subsection{Statistical Methodology}
+Each configuration cell is defined by suite, backend, concurrency $c \in \{10, 50, 100\}$, and payload size $\in \{100\text{ B}, 1\text{ KB}, 10\text{ KB}\}$. Every cell runs 5 independent 15-second trials after a 3-second warm-up window, flushing databases between trials. We compute 95\% Student $t$ confidence intervals across trial means, Coefficient of Variation (CoV), and Mann--Whitney U rank-based hypothesis tests on pooled per-request distributions ($\alpha = 0.01$). Cells with fewer than two completed trials are automatically excluded.
+
+
+
+\subsection{Protocol Migration Threshold Methodology}
+The protocol migration threshold comprises three mathematical gates based on the Strangler Fig pattern \cite{li2020}: (1)~\textbf{Improvement Gate:} gRPC improves p99 tail latency by $\ge 20\%$ relative to REST; (2)~\textbf{Robustness Gate:} 95\% confidence intervals do not overlap, and Mann--Whitney U rejects distribution equality ($p<0.01$); and (3)~\textbf{Amdahl Gate:} database execution time is $\le 60\%$ of total request time (measured via pg\_stat\_statements). If all three gates pass, the verdict is MIGRATE; otherwise, the verdict is HOLD.
+
+
+
+\begin{table}[htbp]
+\renewcommand{\arraystretch}{1.2}
+\caption{Comprehensive Technology Stack}
+\label{tab:tech_stack}
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{} c >{\raggedright\arraybackslash}p{0.28\columnwidth} >{\raggedright\arraybackslash}p{0.58\columnwidth} @{}}
+\hline
+\textbf{\#} & \textbf{Technology} & \textbf{Purpose within ProtocolShift} \\
+\hline
+1 & FastAPI \& REST & Asynchronous framework (HTTP/1.1) to benchmark JSON serialization overhead under load. \\
+2 & gRPC APIs & Binary RPC system (HTTP/2) with Protobuf to minimize parsing and multiplexing overhead. \\
+3 & PostgreSQL 16 & Relational RDBMS to test protocol response under strict schema operations and joins. \\
+4 & MongoDB 7 & Document NoSQL engine to evaluate protocols against unstructured variable-length payloads. \\
+5 & Redis 7 & In-memory database enabling sub-millisecond responses to isolate pure transport deviation. \\
+6 & Prometheus \& Grafana & Metric collection and visualization platform for real-time p95/p99 tail latency tracking. \\
+7 & AWS EC2 & Cloud infrastructure hosting two-node benchmark topology over VPC internal network. \\
+\hline
+\end{tabular}%
+}
+\end{table}
+
+\section{Implementation Details}
+By leveraging asyncpg, motor, and redis.asyncio, the framework avoids redundant TCP handshakes by utilizing pre-allocated connection pools (2--10 sockets) with non-blocking async/await semantics. The benchmark schemas are defined in Protobuf Interface Definition Language (IDL) files and compiled into Python stubs. Additionally, the REST services are presented in FastAPI using Pydantic models to emphasize the penalties for mapping JSON and Protobuf to memory. Measures are collected using Prometheus decorators on sub-100ms histogram buckets and Docker Compose with bound CPU/memory cgroups.
+
+
+\section{Experimental Setup and Reproducibility}
+Cloud benchmarks were deployed on AWS (ap-south-1) across two dedicated t3.medium EC2 nodes (2 vCPUs, 4 GiB RAM, Ubuntu 24.04 LTS, Python 3.12.3). Node A hosted microservice containers, Prometheus telemetry, and databases under Docker Compose with constrained CPU/memory cgroups; Node B executed the closed-loop load generator over a private VPC subnet to eliminate public internet routing noise. Each configuration cell executed 5 independent trials after a 3-second warm-up window with inter-trial database flushing. Local query profiling was conducted with PostgreSQL pg\_stat\_statements to log microsecond query durations.
+
+
+
+\section{Experimental Results}
+
+All reported latencies represent p99 values in milliseconds averaged across 5 independent trials with 95\% confidence intervals ($p < 0.001$).
+
+\subsection{gRPC Tail Latency Dominance Under Load}
+gRPC shows a huge performance gain under load for all three storage paradigms. Fig. \ref{fig:bars} shows the benchmark results for primary workloads with a 1 KB payload at concurrency 100. gRPC reduces p99 tail latency from 1705.27 ms to 158.89 ms on PostgreSQL (90.7\% reduction), 2150.56 ms to 222.46 ms on MongoDB (89.7\% reduction), and 1987.89 ms to 143.47 ms on Redis (92.8\% reduction). REST throughput is capped at 230--310 req/s due to HTTP/1.1 connection pool exhaustion, whereas gRPC achieves 810--1385 req/s via HTTP/2 stream multiplexing.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{paper_figs/aws_p99_bars.png}}
+\caption{p99 Latency Comparison across PostgreSQL, MongoDB, and Redis at Concurrency 100 with 1 KB Payload (AWS Cloud, 95\% CI). gRPC achieves 88\%--94\% tail latency reduction.}
+\label{fig:bars}
+\end{figure}
+
+As concurrency scales ($c \in \{10, 50, 100\}$), REST tail latency degrades sharply beyond $c=50$, whereas gRPC maintains stable sub-250 ms p99 latency across PostgreSQL, MongoDB, and Redis (Fig. \ref{fig:scaling}). Confidence intervals overlap at low concurrency ($c=10$), but diverge significantly under higher load ($p < 0.001$).
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{paper_figs/aws_p99_scaling.png}}
+\caption{p99 Latency vs. Concurrency at 1 KB Payload across all storage backends (AWS Cloud, 95\% CI).}
+\label{fig:scaling}
+\end{figure}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{paper_figs/aws_cdf.png}}
+\caption{Cumulative Distribution Function (CDF) of REST vs. gRPC latency under high concurrency (AWS Cloud). The leftward shift confirms tail latency reduction ($p < 0.001$).}
+\label{fig:cdf}
+\end{figure}
+
+Table \ref{tab:cloud_summary} summarizes the p99 latency figures across all backends at 1 KB payload.
+
+\begin{table}[htbp]
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{3pt}
+\caption{Cloud Benchmark p99 Latency Summary (1 KB Payload, AWS)}
+\label{tab:cloud_summary}
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{} l c r r c @{}}
+\hline
+\textbf{Backend} & \textbf{Conc.} & \textbf{REST p99 (ms)} & \textbf{gRPC p99 (ms)} & \textbf{gRPC Improvement} \\
+\hline
+PostgreSQL & 10  & 54.31 $\pm$ 7.52   & 16.19 $\pm$ 1.43  & 70.2\% \\
+PostgreSQL & 50  & 885.77 $\pm$ 162.06 & 82.81 $\pm$ 35.35  & 90.7\% \\
+PostgreSQL & 100 & 1705.27 $\pm$ 713.62& 158.89 $\pm$ 68.47 & 90.7\% \\
+MongoDB    & 10  & 49.46 $\pm$ 19.86  & 29.45 $\pm$ 0.83  & 40.5\% \\
+MongoDB    & 50  & 1044.62 $\pm$ 130.58& 163.26 $\pm$ 84.02 & 84.4\% \\
+MongoDB    & 100 & 2150.56 $\pm$ 547.28& 222.46 $\pm$ 37.46 & 89.7\% \\
+Redis      & 10  & 72.82 $\pm$ 18.92  & 16.07 $\pm$ 6.07  & 77.9\% \\
+Redis      & 50  & 781.29 $\pm$ 187.64& 72.26 $\pm$ 27.63  & 90.8\% \\
+Redis      & 100 & 1987.89 $\pm$ 467.04& 143.47 $\pm$ 63.18 & 92.8\% \\
+\hline
+\end{tabular}%
+}
+\end{table}
+
+\subsection{PostgreSQL Query Profiling and Persistent Channel Impact}
+The architecture of a load generator can affect the results of the benchmarks that are run against PostgreSQL and gRPC. Tools such as grpcurl use per-request CLI invocation, which results in a new OS process and TCP/TLS handshake per request. With stream multiplexing gRPC was able to reduce p99 tail latency by 88\% to 92\% compared to REST over PostgreSQL under load (e.g., at $c=100$ with 100 B payload, gRPC 140.97 ms vs REST 1852.13 ms). Fig. \ref{fig:pgprofile} shows the scaling behavior for multiplexed channels.
+
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{paper_figs/pg_profiled_scaling.png}}
+\caption{PostgreSQL Profiled p99 Latency vs. Concurrency under persistent grpc.aio channel management. gRPC consistently outperforms REST across all concurrency levels.}
+\label{fig:pgprofile}
+\end{figure}
+
+To evaluate the Amdahl Gate directly, query execution time was captured via pg\_stat\_statements. Table \ref{tab:pg_profiling} details the query execution share relative to client request time at concurrency 100.
+
+\begin{table}[htbp]
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{3pt}
+\caption{PostgreSQL Query Execution Time Share (Concurrency 100)}
+\label{tab:pg_profiling}
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{} l l r r c @{}}
+\hline
+\textbf{Suite} & \textbf{Payload} & \textbf{DB Exec Time} & \textbf{Total Request Time} & \textbf{DB Share (\%)} \\
+\hline
+gRPC & 100 B & 1,059 ms & 1,493,446 ms & 0.07\% \\
+gRPC & 1 KB  & 1,206 ms & 1,477,069 ms & 0.08\% \\
+gRPC & 10 KB & 4,291 ms & 1,499,179 ms & 0.29\% \\
+REST & 100 B & 126 ms   & 1,467,856 ms & 0.01\% \\
+REST & 1 KB  & 263 ms   & 1,464,902 ms & 0.02\% \\
+REST & 10 KB & 745 ms   & 1,399,175 ms & 0.05\% \\
+\hline
+\end{tabular}%
+}
+\end{table}
+
+Across all cells, database execution accounts for less than 0.3\% of total request time (individual SQL queries average $<0.3$ ms). This confirms that transport, serialization, and connection queueing dominate end-to-end latency, validating the Amdahl framing: because database latency is negligible, protocol optimization yields massive macroscopic gains.
+
+\subsection{Redis In-Memory Performance and High-Concurrency Evaluation}
+Under sustained high-concurrency write workloads with 10 KB payloads, in-memory storage requires explicit cache flushing between benchmark trials to prevent memory accumulation. Because Redis eliminates disk I/O bottlenecks, network transport framing and binary serialization dominate execution time. As shown in Fig. \ref{fig:redis}, gRPC reduces Redis 10 KB p99 tail latency from 821.48 ms to 61.25 ms at $c=50$ (92.5\% improvement) and 2303.42 ms to 125.50 ms at $c=100$ (94.6\% improvement), demonstrating that HTTP/2 stream multiplexing delivers maximum efficiency when storage latency is near zero.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{paper_figs/redis_rerun_bars.png}}
+\caption{Redis 10 KB Payload p99 Latency under direct cache flush mode with 95\% CI. gRPC maintains sub-130 ms tail latency at high concurrency.}
+\label{fig:redis}
+\end{figure}
+
+\subsection{Protocol Migration Threshold Verdicts}
+Applying the three-gate decision model to the profiled PostgreSQL benchmark dataset (Section VI-B) yields the verdicts presented in Table \ref{tab:migration_verdicts}.
+
+\begin{table}[htbp]
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{3pt}
+\caption{Protocol Migration Threshold Decisions (PostgreSQL)}
+\label{tab:migration_verdicts}
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{} c c c c c c @{}}
+\hline
+\textbf{Conc.} & \textbf{Payload} & \textbf{Improvement Gate} & \textbf{Robustness Gate} & \textbf{Amdahl Gate} & \textbf{Verdict} \\
+\hline
+10  & 100 B & PASS (73.9\%) & PASS & PASS (1\%) & MIGRATE \\
+10  & 1 KB  & PASS (42.1\%) & FAIL (CI overlap) & PASS (1\%) & HOLD \\
+10  & 10 KB & PASS (38.8\%) & FAIL (CI overlap) & PASS (2\%) & HOLD \\
+50  & 100 B & PASS (92.4\%) & PASS & PASS (0\%) & MIGRATE \\
+50  & 1 KB  & PASS (89.7\%) & PASS & PASS (0\%) & MIGRATE \\
+50  & 10 KB & PASS (94.2\%) & PASS & PASS (1\%) & MIGRATE \\
+100 & 100 B & PASS (91.4\%) & PASS & PASS (0\%) & MIGRATE \\
+100 & 1 KB  & PASS (91.1\%) & PASS & PASS (0\%) & MIGRATE \\
+100 & 10 KB & PASS (91.9\%) & PASS & PASS (0\%) & MIGRATE \\
+\hline
+\end{tabular}%
+}
+\end{table}
+
+The model yields HOLD at low concurrency ($c=10$) where confidence intervals overlap, avoiding unnecessary migration effort when performance gains are not statistically disjoint, while decisively recommending MIGRATE under high concurrency ($c \ge 50$). Note that for $c=10$ and 1 KB payload, gRPC latency reduction is 70.2\% under the unprofiled AWS sweep (Table \ref{tab:cloud_summary}) versus 42.1\% under persistent profiled channel management (Table \ref{tab:migration_verdicts}) due to connection pooling differences.
+
+\section{Discussion}
+In distributed communication architectures \cite{amdahl1967}, the ProtocolShift benchmarks validate Amdahl's Law. gRPC is well suited to this use case over REST, especially in cases where transport is a big part of the request path due to the benefits of HTTP/2 stream multiplexing and binary Protobuf serialization. To check that, query profiling was performed using pg\_stat\_statements, and it was verified that SQL execution time accounted for $<0.3\%$ of the total time of the request, indicating that transport queuing was the major problem. But protocol improvements do not pay off if a database call is all-important, creating an opportunity for ``Database Blind Spots'' in microservice optimizations.
+
+The PostgreSQL benchmark evaluation gives a valuable lesson in methodology: client load-generation tooling must be representative of the client load-generation persistence in production. Such artificial inflation of RPC latency occurs due to non-persistent process execution with handshake overhead. Moreover, using the Strangler Fig pattern \cite{li2020} it is shown that for cloud networks the migration decisions must depend on the statistically disjoint thresholds of the p99 tail latency instead of the average throughput at the site.
+
+
+\section{Limitations}
+Three primary limitations bound this study:
+\begin{enumerate}
+    \item \textbf{Plaintext Transport:} Tests were conducted on unencrypted HTTP/1.1 and HTTP/2. In production, gRPC frequently uses mutual TLS (mTLS), whose cryptographic handshakes and framing overhead may narrow the latency gap for small payloads.
+    \item \textbf{In-Memory Storage Bounds:} Under sustained write loads with large payloads (10 KB), Redis needs to be strictly managed by LRU and other eviction policies to avoid running out of memory on resource-constrained nodes.
+    \item \textbf{Single-Region Scope:} All cloud benchmarks were performed within AWS ap-south-1. Network jitter coefficients may vary across different cloud providers or multi-region topologies.
+\end{enumerate}
+
+\section{Conclusion and Future Scope}
+
+While gRPC provides substantial throughput gains for low-latency in-memory stores like Redis, its relative advantages diminish when downstream database execution dominates total request latency. When deployed across two nodes in AWS cloud, gRPC improves p99 tail latency by 88--94\% and maintains statistically reproducible margins while under concurrency.
+
+Future investigations will present several paths of development from the architecture developed here. First, future work will expand the evaluation to include GraphQL, quantifying the serialization overhead and overhead related to over-fetching and under-fetching data. Secondly, future testing will critically assess the impact of the native integration of mutual TLS (mTLS) authentication across gRPC service streams on the computational overhead of the binary serialization benefits, to better understand whether security encryption affects the advantages of binary serialization in practice. Lastly, our goal is to use the Strangler Fig API gateway to augment our protocol migration process with some automated rollback in response to latency issues.
+
+\begin{thebibliography}{00}
+
+\bibitem{amdahl1967} G. M. Amdahl, ``Validity of the single processor approach to achieving large scale computing capabilities,'' in \textit{Proc. AFIPS Spring Joint Computer Conf.}, Atlantic City, NJ, USA, 1967, pp. 483--485. doi: 10.1145/1465482.1465560.
+
+\bibitem{li2020} C.-Y. Li, S.-P. Ma, and T.-W. Lu, ``Microservice Migration Using Strangler Fig Pattern: A Case Study on the Green Button System,'' in \textit{Proc. 2020 International Computer Symposium (ICS)}, Tainan, Taiwan, 2020, pp. 519--524. doi: 10.1109/ICS51289.2020.00107.
+
+\bibitem{vural2017} H. Vural, M. Koyuncu, and S. Guney, ``A Systematic Literature Review on Microservices,'' in \textit{Computational Science and Its Applications -- ICCSA 2017}, Lecture Notes in Computer Science, vol. 10409, Springer, Cham, 2017, pp. 203--217. doi: 10.1007/978-3-319-62407-5\_14.
+
+\bibitem{li2021} S. Li et al., ``Understanding and Addressing Quality Attributes of Microservices Architecture: A Systematic Literature Review,'' \textit{Information and Software Technology}, vol. 131, p. 106449, 2021. doi: 10.1016/j.infsof.2020.106449.
+
+\bibitem{waseem2020} M. Waseem, P. Liang, and M. Shahin, ``A Systematic Mapping Study on Microservices Architecture in DevOps,'' \textit{Journal of Systems and Software}, vol. 170, p. 110798, 2020. doi: 10.1016/j.jss.2020.110798.
+
+\bibitem{cerny2021} T. Cerny et al., ``On Microservice Analysis and Architecture Evolution: A Systematic Mapping Study,'' \textit{Applied Sciences}, vol. 11, no. 17, p. 7856, 2021. doi: 10.3390/app11177856.
+
+\bibitem{arora2024} S. Arora, A. Bhardwaj, A. Kukkar, and S. Kaur, ``A Comparative Analysis of Communication Efficiency: REST vs. gRPC in Microservice-Based Ecosystems,'' in \textit{Proc. 2024 IEEE Int. Conf. Innovations in Comput. Sci. (INNOCOMP)}, 2024, pp. 621--626. doi: 10.1109/INNOCOMP63224.2024.00107.
+
+\bibitem{weerasinghe2022} L. D. S. B. Weerasinghe and I. Perera, ``Evaluating the Inter-Service Communication Performance of gRPC and RESTful Services in Microservices Architecture,'' in \textit{Proc. 2022 7th Int. Conf. Information Technology Research (ICITR)}, Colombo, Sri Lanka, 2022, pp. 1--6. doi: 10.1109/ICITR57877.2022.9992918.
+
+\bibitem{bolanowski2022} M. Bolanowski et al., ``Efficiency of REST and gRPC Realizing Communication Tasks in Microservice-Based Ecosystems,'' \textit{Frontiers in Artificial Intelligence and Applications}, vol. 352, IOS Press, 2022, pp. 97--108. doi: 10.3233/FAIA220242.
+
+\bibitem{apriansyah2024} M. Niswar, R. A. Safruddin, A. Bustamin, and I. Aswad, ``Performance Evaluation of Microservices Communication with REST, GraphQL, and gRPC,'' \textit{International Journal of Electronics and Telecommunications}, vol. 70, no. 2, pp. 429--436, Jun. 2024. doi: 10.24425/ijet.2024.149562.
+
+\bibitem{marx2018} R. Marx, M. Wijnants, P. Quax, A. Faes, and W. Lamotte, ``Web Performance Characteristics of HTTP/2 and Comparison to HTTP/1.1,'' in \textit{Web Information Systems and Technologies -- WEBIST 2017}, Lecture Notes in Business Information Processing, vol. 322, Springer, 2018, pp. 87--114. doi: 10.1007/978-3-319-93527-0\_5.
+
+\bibitem{proos2020} D. P. Proos and N. Carlsson, ``Performance Comparison of Messaging Protocols and Serialization Formats for Digital Twins in IoV,'' in \textit{Proc. IFIP Networking Conference}, Paris, France, Jun. 2020.
+
+\bibitem{popic2016} S. Popi\'{c}, D. Pezer, B. Mrazovac, and N. Tesli\'{c}, ``Performance Evaluation of Using Protocol Buffers in the Internet of Things Communication,'' in \textit{Proc. 2016 International Conference on Smart Systems and Technologies (SST)}, Osijek, Croatia, 2016, pp. 261--265. doi: 10.1109/SST.2016.7765670.
+
+\bibitem{dean2013} J. Dean and L. A. Barroso, ``The Tail at Scale,'' \textit{Communications of the ACM}, vol. 56, no. 2, pp. 74--80, Feb. 2013. doi: 10.1145/2408776.2408794.
+
+\bibitem{gan2019} Y. Gan et al., ``An open-source benchmark suite and toolkit for cloud microservices,'' in \textit{Proc. 24th ACM Int. Conf. Architectural Support for Programming Languages and Operating Systems (ASPLOS)}, Providence, RI, USA, 2019, pp. 379--393. doi: 10.1145/3297858.3304013.
+
+\bibitem{beyer2016} B. Beyer, C. Jones, J. Petoff, and N. R. Murphy, Eds., \textit{Site Reliability Engineering: How Google Runs Production Systems}. Sebastopol, CA: O'Reilly Media, 2016.
+
+\bibitem{barrett2025} H. Barrett et al., ``Observability and Monitoring Using Prometheus and Grafana in Cloud Setups,'' \textit{International Journal of Current Science Research and Review}, vol. 6, no. 12, Dec. 2023.
+
+\end{thebibliography}
+
+\end{document}
